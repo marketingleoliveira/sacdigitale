@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
+import logoBlue from '@/assets/logo-blue.png';
 
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -83,8 +84,8 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-            <ShieldCheck className="h-6 w-6 text-primary" />
+          <div className="mx-auto mb-4">
+            <img src={logoBlue} alt="Digitale Têxtil" className="h-20 w-auto mx-auto" />
           </div>
           <CardTitle>Painel Administrativo</CardTitle>
           <CardDescription>

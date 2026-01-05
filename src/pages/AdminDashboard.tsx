@@ -45,6 +45,7 @@ import {
   Users,
 } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
+import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
@@ -171,9 +172,12 @@ export default function AdminDashboard() {
       {/* Header */}
       <header className="bg-card border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Painel SAC</h1>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+          <div className="flex items-center gap-4">
+            <img src={logoBlue} alt="Digitale Têxtil" className="h-10 w-auto" />
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Painel SAC</h1>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
           </div>
           <Button variant="outline" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />
