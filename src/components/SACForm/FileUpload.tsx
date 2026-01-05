@@ -33,7 +33,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
   const addFiles = (newFiles: File[]) => {
     const validFiles = newFiles.filter(
       (file) =>
-        file.size <= 5 * 1024 * 1024 && // 5MB limit
+        file.size <= 100 * 1024 * 1024 && // 100MB limit
         (file.type.startsWith("image/") || file.type === "application/pdf")
     );
     const updatedFiles = [...files, ...validFiles].slice(0, maxFiles);
@@ -79,7 +79,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
           Clique para enviar ou arraste seus arquivos
         </p>
         <p className="text-sm text-muted-foreground mt-2">
-          PNG, JPG ou PDF até 5MB (máximo {maxFiles} arquivos)
+          PNG, JPG ou PDF até 100MB (máximo {maxFiles} arquivos)
         </p>
       </div>
 

@@ -56,6 +56,47 @@ export type Database = {
         }
         Relationships: []
       }
+      tickets: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          id: string
+          is_internal: boolean
+          message: string
+          sac_request_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          is_internal?: boolean
+          message: string
+          sac_request_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_internal?: boolean
+          message?: string
+          sac_request_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_sac_request_id_fkey"
+            columns: ["sac_request_id"]
+            isOneToOne: false
+            referencedRelation: "sac_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string

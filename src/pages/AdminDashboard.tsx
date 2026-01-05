@@ -45,6 +45,7 @@ import {
   Users,
 } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
+import TicketSystem from '@/components/admin/TicketSystem';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -313,11 +314,11 @@ export default function AdminDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Protocolo</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>E-mail</TableHead>
-                          <TableHead>Status</TableHead>
+                              <TableHead>Protocolo</TableHead>
+                              <TableHead>Tipo</TableHead>
+                              <TableHead>Empresa</TableHead>
+                              <TableHead>E-mail</TableHead>
+                              <TableHead>Status</TableHead>
                           <TableHead>Data</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
@@ -402,7 +403,7 @@ export default function AdminDashboard() {
               <div className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground text-xs">Nome</Label>
+                    <Label className="text-muted-foreground text-xs">Empresa</Label>
                     <p className="font-medium">{selectedRequest.name}</p>
                   </div>
                   <div>
@@ -442,6 +443,14 @@ export default function AdminDashboard() {
                   <div className="mt-1 p-4 bg-muted rounded-lg">
                     <p className="whitespace-pre-wrap">{selectedRequest.message}</p>
                   </div>
+                </div>
+
+                {/* Ticket System */}
+                <div className="pt-4 border-t">
+                  <TicketSystem
+                    sacRequestId={selectedRequest.id}
+                    currentUserId={user.id}
+                  />
                 </div>
               </div>
             </>
