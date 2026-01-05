@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,6 +72,7 @@ export default function AdminDashboard() {
   const [filteredRequests, setFilteredRequests] = useState<SACRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<SACRequest | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -130,6 +132,34 @@ export default function AdminDashboard() {
     setSearchTerm('');
     setTypeFilter('all');
     setStatusFilter('all');
+  };
+
+  const updateRequestStatus = async (requestId: string, newStatus: string) => {
+    setIsUpdatingStatus(true);
+    try {
+      const { error } = await supabase
+        .from('sac_requests')
+        .update({ status: newStatus })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      // Update local state
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
+      );
+      
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest((prev) => prev ? { ...prev, status: newStatus } : null);
+      }
+
+      toast.success('Status atualizado com sucesso');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Erro ao atualizar status');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -425,16 +455,37 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <Label className="text-muted-foreground text-xs">Status</Label>
+                  <Label className="text-muted-foreground text-xs">Alterar Status</Label>
                   <div className="mt-1">
-                    <Badge
-                      variant="outline"
-                      className={
-                        (statusConfig[selectedRequest.status] || statusConfig.pendente).color
-                      }
+                    <Select
+                      value={selectedRequest.status}
+                      onValueChange={(value) => updateRequestStatus(selectedRequest.id, value)}
+                      disabled={isUpdatingStatus}
                     >
-                      {(statusConfig[selectedRequest.status] || statusConfig.pendente).label}
-                    </Badge>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pendente">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                            Pendente
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="em_andamento">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                            Em Andamento
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="resolvido">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            Resolvido
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
