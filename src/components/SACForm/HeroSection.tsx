@@ -1,4 +1,4 @@
-import { Headset } from "lucide-react";
+import logoWhite from "@/assets/logo-white.png";
 
 const HeroSection = () => {
   return (
@@ -15,9 +15,9 @@ const HeroSection = () => {
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col items-center text-center">
-          {/* Logo/Icon */}
-          <div className="w-20 h-20 bg-primary-foreground/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 animate-fade-in">
-            <Headset className="w-10 h-10" />
+          {/* Logo */}
+          <div className="mb-6 animate-fade-in">
+            <img src={logoWhite} alt="Digitale Têxtil" className="h-24 md:h-32 w-auto" />
           </div>
 
           <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-slide-up">
