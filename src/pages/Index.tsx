@@ -1,5 +1,8 @@
+import { Link } from "react-router-dom";
 import HeroSection from "@/components/SACForm/HeroSection";
 import SACForm from "@/components/SACForm/SACForm";
+import { Button } from "@/components/ui/button";
+import { Lock } from "lucide-react";
 
 const Index = () => {
   return (
@@ -29,6 +32,14 @@ const Index = () => {
             <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
               Contato
             </a>
+          </div>
+          <div className="mt-6">
+            <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+              <Link to="/admin/login">
+                <Lock className="h-3 w-3 mr-2" />
+                Área Administrativa
+              </Link>
+            </Button>
           </div>
         </div>
       </footer>
