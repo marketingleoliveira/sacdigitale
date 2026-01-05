@@ -42,8 +42,8 @@ const SACForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
-    if (!formData.name || !formData.email || !formData.contactType || !formData.message) {
+    // Validation - All fields required
+    if (!formData.name || !formData.email || !formData.phone || !formData.orderNumber || !formData.contactType || !formData.subject || !formData.message) {
       toast.error("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
@@ -62,9 +62,9 @@ const SACForm = () => {
           contactType: formData.contactType,
           name: formData.name,
           email: formData.email,
-          phone: formData.phone || undefined,
-          orderNumber: formData.orderNumber || undefined,
-          subject: formData.subject || undefined,
+          phone: formData.phone,
+          orderNumber: formData.orderNumber,
+          subject: formData.subject,
           message: formData.message,
         },
       });
@@ -178,14 +178,14 @@ const SACForm = () => {
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Nome completo <span className="text-destructive">*</span>
+              Nome da Empresa <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              placeholder="Digite seu nome"
+              placeholder="Digite o nome da empresa"
               className="input-field"
               maxLength={100}
             />
@@ -206,7 +206,7 @@ const SACForm = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Telefone (opcional)
+              Telefone <span className="text-destructive">*</span>
             </label>
             <input
               type="tel"
@@ -219,7 +219,7 @@ const SACForm = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Número do pedido (opcional)
+              Número do pedido <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
@@ -254,7 +254,7 @@ const SACForm = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Assunto
+              Assunto <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
