@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, CheckCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import FormSection from "./FormSection";
 import ContactTypeSelector from "./ContactTypeSelector";
 import FileUpload from "./FileUpload";
@@ -18,6 +19,8 @@ interface FormData {
 
 const SACForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [protocol, setProtocol] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
@@ -53,24 +56,107 @@ const SACForm = () => {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const { data, error } = await supabase.functions.invoke("submit-sac", {
+        body: {
+          contactType: formData.contactType,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || undefined,
+          orderNumber: formData.orderNumber || undefined,
+          subject: formData.subject || undefined,
+          message: formData.message,
+        },
+      });
 
-    setIsSubmitting(false);
-    toast.success("Sua mensagem foi enviada com sucesso! Entraremos em contato em breve.");
+      if (error) {
+        console.error("Error submitting SAC request:", error);
+        toast.error("Erro ao enviar solicitação. Tente novamente.");
+        return;
+      }
 
-    // Reset form
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      orderNumber: "",
-      contactType: "",
-      subject: "",
-      message: "",
-      files: [],
-    });
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      setProtocol(data.protocol);
+      setIsSuccess(true);
+      toast.success("Solicitação enviada com sucesso!");
+
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        orderNumber: "",
+        contactType: "",
+        subject: "",
+        message: "",
+        files: [],
+      });
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Erro ao enviar solicitação. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const copyProtocol = () => {
+    if (protocol) {
+      navigator.clipboard.writeText(protocol);
+      toast.success("Protocolo copiado!");
+    }
+  };
+
+  const handleNewRequest = () => {
+    setIsSuccess(false);
+    setProtocol(null);
+  };
+
+  if (isSuccess && protocol) {
+    return (
+      <div className="card-elevated rounded-2xl p-8 md:p-12 text-center space-y-6 animate-fade-in">
+        <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+          <CheckCircle className="w-10 h-10 text-green-600" />
+        </div>
+        
+        <h2 className="text-2xl font-bold text-foreground">
+          Solicitação Enviada com Sucesso!
+        </h2>
+        
+        <p className="text-muted-foreground">
+          Recebemos sua solicitação e enviaremos um e-mail de confirmação para você.
+          Nossa equipe analisará e retornará o mais breve possível.
+        </p>
+        
+        <div className="bg-primary/5 border-2 border-dashed border-primary rounded-xl p-6">
+          <p className="text-sm text-muted-foreground mb-2">Seu número de protocolo:</p>
+          <div className="flex items-center justify-center gap-3">
+            <span className="text-2xl font-bold text-primary">{protocol}</span>
+            <button
+              onClick={copyProtocol}
+              className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
+              title="Copiar protocolo"
+            >
+              <Copy className="w-5 h-5 text-primary" />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Guarde este número para acompanhar sua solicitação
+          </p>
+        </div>
+        
+        <button
+          onClick={handleNewRequest}
+          className="btn-primary"
+        >
+          Fazer Nova Solicitação
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

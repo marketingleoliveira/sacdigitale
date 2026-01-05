@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      sac_requests: {
+        Row: {
+          attachments: string[] | null
+          contact_type: Database["public"]["Enums"]["contact_type"]
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          order_number: string | null
+          phone: string | null
+          protocol: string
+          status: string
+        }
+        Insert: {
+          attachments?: string[] | null
+          contact_type: Database["public"]["Enums"]["contact_type"]
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+          order_number?: string | null
+          phone?: string | null
+          protocol: string
+          status?: string
+        }
+        Update: {
+          attachments?: string[] | null
+          contact_type?: Database["public"]["Enums"]["contact_type"]
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+          order_number?: string | null
+          phone?: string | null
+          protocol?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +64,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      contact_type: "reclamacao" | "sugestao" | "elogio" | "duvida"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +191,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      contact_type: ["reclamacao", "sugestao", "elogio", "duvida"],
+    },
   },
 } as const
