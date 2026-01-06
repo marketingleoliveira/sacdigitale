@@ -42,7 +42,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Request data:", requestData);
 
     // Validate required fields
-    if (!requestData.contactType || !requestData.name || !requestData.email || !requestData.message) {
+    if (!requestData.contactType || !requestData.name || !requestData.email || !requestData.phone || !requestData.orderNumber || !requestData.subject || !requestData.message) {
       console.log("Missing required fields");
       return new Response(
         JSON.stringify({ error: "Campos obrigatórios não preenchidos" }),
@@ -64,8 +64,9 @@ const handler = async (req: Request): Promise<Response> => {
         contact_type: requestData.contactType,
         name: requestData.name,
         email: requestData.email,
-        phone: requestData.phone || null,
-        order_number: requestData.orderNumber || null,
+        phone: requestData.phone,
+        order_number: requestData.orderNumber,
+        subject: requestData.subject,
         message: requestData.message,
         protocol: protocol,
       })

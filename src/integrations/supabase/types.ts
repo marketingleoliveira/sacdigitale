@@ -29,6 +29,7 @@ export type Database = {
           procedencia: string | null
           protocol: string
           status: string
+          subject: string | null
         }
         Insert: {
           attachments?: string[] | null
@@ -44,6 +45,7 @@ export type Database = {
           procedencia?: string | null
           protocol: string
           status?: string
+          subject?: string | null
         }
         Update: {
           attachments?: string[] | null
@@ -59,6 +61,7 @@ export type Database = {
           procedencia?: string | null
           protocol?: string
           status?: string
+          subject?: string | null
         }
         Relationships: []
       }

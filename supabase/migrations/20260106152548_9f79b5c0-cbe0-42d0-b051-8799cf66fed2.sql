@@ -1,0 +1,1 @@
+ALTER TABLE public.sac_requests ADD COLUMN IF NOT EXISTS subject TEXT;
