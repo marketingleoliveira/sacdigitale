@@ -32,10 +32,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
 
   const addFiles = (newFiles: File[]) => {
     const validFiles = newFiles.filter(
-      (file) =>
-        file.type.startsWith("image/") || 
-        file.type.startsWith("video/") || 
-        file.type === "application/pdf"
+      (file) => file.type.startsWith("image/") || file.type.startsWith("video/") || file.type === "application/pdf",
     );
     const updatedFiles = [...files, ...validFiles].slice(0, maxFiles);
     onFilesChange(updatedFiles);
@@ -72,9 +69,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 ${
-          isDragging
-            ? "border-primary bg-primary/5"
-            : "border-border hover:border-primary/50 hover:bg-muted/50"
+          isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/50"
         }`}
       >
         <input
@@ -86,30 +81,19 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
           className="hidden"
         />
         <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-        <p className="text-foreground font-medium">
-          Clique para enviar ou arraste seus arquivos
-        </p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Imagens, vídeos ou PDF (máximo {maxFiles} arquivos)
-        </p>
+        <p className="text-foreground font-medium">Clique para enviar ou arraste seus arquivos</p>
+        <p className="text-sm text-muted-foreground mt-2">Imagens, vídeos ou PDF.</p>
       </div>
 
       {files.length > 0 && (
         <div className="space-y-2">
           {files.map((file, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-3 bg-muted rounded-lg"
-            >
+            <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div className="flex items-center gap-3">
                 {getFileIcon(file)}
                 <div>
-                  <p className="text-sm font-medium text-foreground truncate max-w-[200px]">
-                    {file.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(file.size)}
-                  </p>
+                  <p className="text-sm font-medium text-foreground truncate max-w-[200px]">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                 </div>
               </div>
               <button
