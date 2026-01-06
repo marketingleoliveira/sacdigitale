@@ -44,9 +44,12 @@ import {
   X,
   Inbox,
   Users,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
+import LaudosUpload from '@/components/admin/LaudosUpload';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -73,6 +76,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<SACRequest | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isUpdatingProcedencia, setIsUpdatingProcedencia] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,6 +163,43 @@ export default function AdminDashboard() {
       toast.error('Erro ao atualizar status');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const updateRequestProcedencia = async (requestId: string, procedencia: string | null) => {
+    setIsUpdatingProcedencia(true);
+    try {
+      const { error } = await supabase
+        .from('sac_requests')
+        .update({ procedencia })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, procedencia } : r))
+      );
+
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest((prev) => prev ? { ...prev, procedencia } : null);
+      }
+
+      toast.success('Procedência atualizada com sucesso');
+    } catch (error) {
+      console.error('Error updating procedencia:', error);
+      toast.error('Erro ao atualizar procedência');
+    } finally {
+      setIsUpdatingProcedencia(false);
+    }
+  };
+
+  const updateRequestLaudos = (requestId: string, laudos: string[]) => {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, laudos } : r))
+    );
+
+    if (selectedRequest?.id === requestId) {
+      setSelectedRequest((prev) => prev ? { ...prev, laudos } : null);
     }
   };
 
@@ -454,39 +495,80 @@ export default function AdminDashboard() {
                   )}
                 </div>
 
-                <div>
-                  <Label className="text-muted-foreground text-xs">Alterar Status</Label>
-                  <div className="mt-1">
-                    <Select
-                      value={selectedRequest.status}
-                      onValueChange={(value) => updateRequestStatus(selectedRequest.id, value)}
-                      disabled={isUpdatingStatus}
-                    >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pendente">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                            Pendente
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="em_andamento">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-blue-500" />
-                            Em Andamento
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="resolvido">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
-                            Resolvido
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="flex flex-wrap gap-4">
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Alterar Status</Label>
+                    <div className="mt-1">
+                      <Select
+                        value={selectedRequest.status}
+                        onValueChange={(value) => updateRequestStatus(selectedRequest.id, value)}
+                        disabled={isUpdatingStatus}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pendente">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                              Pendente
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="em_andamento">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-blue-500" />
+                              Em Andamento
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="resolvido">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-green-500" />
+                              Resolvido
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
+                  {selectedRequest.contact_type === 'reclamacao' && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Procedência</Label>
+                      <div className="mt-1">
+                        <Select
+                          value={selectedRequest.procedencia || 'nao_avaliado'}
+                          onValueChange={(value) => 
+                            updateRequestProcedencia(selectedRequest.id, value === 'nao_avaliado' ? null : value)
+                          }
+                          disabled={isUpdatingProcedencia}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nao_avaliado">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-gray-400" />
+                                Não avaliado
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="procedente">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                Procedente
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="improcedente">
+                              <div className="flex items-center gap-2">
+                                <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                Improcedente
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -495,6 +577,20 @@ export default function AdminDashboard() {
                     <p className="whitespace-pre-wrap">{selectedRequest.message}</p>
                   </div>
                 </div>
+
+                {/* Laudos Section - Only for reclamacao */}
+                {selectedRequest.contact_type === 'reclamacao' && (
+                  <div className="pt-4 border-t">
+                    <Label className="text-muted-foreground text-xs mb-2 block">
+                      Laudos de Perícia
+                    </Label>
+                    <LaudosUpload
+                      sacRequestId={selectedRequest.id}
+                      existingLaudos={selectedRequest.laudos}
+                      onLaudosChange={(laudos) => updateRequestLaudos(selectedRequest.id, laudos)}
+                    />
+                  </div>
+                )}
 
                 {/* Ticket System */}
                 <div className="pt-4 border-t">
