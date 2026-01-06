@@ -14,6 +14,7 @@ interface SACRequest {
   orderNumber: string;
   subject: string;
   message: string;
+  attachments?: string[];
 }
 
 const generateProtocol = (): string => {
@@ -69,6 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
         subject: requestData.subject,
         message: requestData.message,
         protocol: protocol,
+        attachments: requestData.attachments || null,
       })
       .select()
       .single();
