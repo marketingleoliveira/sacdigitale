@@ -390,6 +390,7 @@ export default function AdminDashboard() {
                               <TableHead>Empresa</TableHead>
                               <TableHead>E-mail</TableHead>
                               <TableHead>Status</TableHead>
+                              <TableHead>Procedência</TableHead>
                           <TableHead>Data</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
@@ -419,6 +420,25 @@ export default function AdminDashboard() {
                                 <Badge variant="outline" className={statConf.color}>
                                   {statConf.label}
                                 </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {request.contact_type === 'reclamacao' ? (
+                                  request.procedencia === 'procedente' ? (
+                                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Procedente
+                                    </Badge>
+                                  ) : request.procedencia === 'improcedente' ? (
+                                    <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      Improcedente
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">—</span>
+                                  )
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
+                                )}
                               </TableCell>
                               <TableCell className="text-muted-foreground text-sm">
                                 {formatDate(request.created_at)}
