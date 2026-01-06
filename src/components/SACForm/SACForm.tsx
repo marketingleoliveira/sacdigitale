@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import FormSection from "./FormSection";
 import ContactTypeSelector from "./ContactTypeSelector";
 import FileUpload from "./FileUpload";
-
 interface FormData {
   name: string;
   email: string;
@@ -16,7 +15,6 @@ interface FormData {
   message: string;
   files: File[];
 }
-
 const SACForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -29,43 +27,38 @@ const SACForm = () => {
     contactType: "",
     subject: "",
     message: "",
-    files: [],
+    files: []
   });
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const {
+      name,
+      value
+    } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
-
   const uploadFiles = async (files: File[]): Promise<string[]> => {
     const uploadedUrls: string[] = [];
-    
     for (const file of files) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `attachments/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('sac-attachments')
-        .upload(filePath, file);
-
+      const {
+        error: uploadError
+      } = await supabase.storage.from('sac-attachments').upload(filePath, file);
       if (uploadError) {
         console.error('Error uploading file:', uploadError);
         throw new Error(`Erro ao enviar arquivo: ${file.name}`);
       }
-
-      const { data: urlData } = supabase.storage
-        .from('sac-attachments')
-        .getPublicUrl(filePath);
-
+      const {
+        data: urlData
+      } = supabase.storage.from('sac-attachments').getPublicUrl(filePath);
       uploadedUrls.push(urlData.publicUrl);
     }
-
     return uploadedUrls;
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -74,15 +67,12 @@ const SACForm = () => {
       toast.error("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast.error("Por favor, insira um e-mail válido.");
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       // Upload files first if any
       let attachmentUrls: string[] = [];
@@ -90,8 +80,10 @@ const SACForm = () => {
         toast.info("Enviando arquivos...");
         attachmentUrls = await uploadFiles(formData.files);
       }
-
-      const { data, error } = await supabase.functions.invoke("submit-sac", {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke("submit-sac", {
         body: {
           contactType: formData.contactType,
           name: formData.name,
@@ -100,21 +92,18 @@ const SACForm = () => {
           orderNumber: formData.orderNumber,
           subject: formData.subject,
           message: formData.message,
-          attachments: attachmentUrls,
-        },
+          attachments: attachmentUrls
+        }
       });
-
       if (error) {
         console.error("Error submitting SAC request:", error);
         toast.error("Erro ao enviar solicitação. Tente novamente.");
         return;
       }
-
       if (data?.error) {
         toast.error(data.error);
         return;
       }
-
       setProtocol(data.protocol);
       setIsSuccess(true);
       toast.success("Solicitação enviada com sucesso!");
@@ -128,7 +117,7 @@ const SACForm = () => {
         contactType: "",
         subject: "",
         message: "",
-        files: [],
+        files: []
       });
     } catch (error: any) {
       console.error("Error:", error);
@@ -137,22 +126,18 @@ const SACForm = () => {
       setIsSubmitting(false);
     }
   };
-
   const copyProtocol = () => {
     if (protocol) {
       navigator.clipboard.writeText(protocol);
       toast.success("Protocolo copiado!");
     }
   };
-
   const handleNewRequest = () => {
     setIsSuccess(false);
     setProtocol(null);
   };
-
   if (isSuccess && protocol) {
-    return (
-      <div className="card-elevated rounded-2xl p-8 md:p-12 text-center space-y-6 animate-fade-in">
+    return <div className="card-elevated rounded-2xl p-8 md:p-12 text-center space-y-6 animate-fade-in">
         <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center">
           <CheckCircle className="w-10 h-10 text-green-600" />
         </div>
@@ -170,11 +155,7 @@ const SACForm = () => {
           <p className="text-sm text-muted-foreground mb-2">Seu número de protocolo:</p>
           <div className="flex items-center justify-center gap-3">
             <span className="text-2xl font-bold text-primary">{protocol}</span>
-            <button
-              onClick={copyProtocol}
-              className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
-              title="Copiar protocolo"
-            >
+            <button onClick={copyProtocol} className="p-2 hover:bg-primary/10 rounded-lg transition-colors" title="Copiar protocolo">
               <Copy className="w-5 h-5 text-primary" />
             </button>
           </div>
@@ -183,18 +164,12 @@ const SACForm = () => {
           </p>
         </div>
         
-        <button
-          onClick={handleNewRequest}
-          className="btn-primary"
-        >
+        <button onClick={handleNewRequest} className="btn-primary">
           Fazer Nova Solicitação
         </button>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+  return <form onSubmit={handleSubmit} className="space-y-6">
       {/* Info Banner */}
       <div className="card-elevated rounded-2xl p-6 border-l-4 border-primary">
         <p className="text-foreground">
@@ -205,115 +180,56 @@ const SACForm = () => {
       </div>
 
       {/* Section 1: Contact Info */}
-      <FormSection
-        number={1}
-        title="Informações de Contato"
-        subtitle="Seus dados para retorno"
-      >
+      <FormSection number={1} title="Informações de Contato" subtitle="Seus dados para retorno">
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               Nome da Empresa <span className="text-destructive">*</span>
             </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              placeholder="Digite o nome da empresa"
-              className="input-field"
-              maxLength={100}
-            />
+            <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Digite o nome da empresa" className="input-field" maxLength={100} />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               E-mail <span className="text-destructive">*</span>
             </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              placeholder="seu@email.com"
-              className="input-field"
-              maxLength={255}
-            />
+            <input type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="seu@email.com" className="input-field" maxLength={255} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Telefone <span className="text-destructive">*</span>
+            <label className="block text-sm font-medium text-foreground mb-2">Whatsapp*<span className="text-destructive">*</span>
             </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              placeholder="(11) 99999-9999"
-              className="input-field"
-            />
+            <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(11) 99999-9999" className="input-field" />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               Número do pedido <span className="text-destructive">*</span>
             </label>
-            <input
-              type="text"
-              name="orderNumber"
-              value={formData.orderNumber}
-              onChange={handleInputChange}
-              placeholder="Ex: #12345"
-              className="input-field"
-            />
+            <input type="text" name="orderNumber" value={formData.orderNumber} onChange={handleInputChange} placeholder="Ex: #12345" className="input-field" />
           </div>
         </div>
       </FormSection>
 
       {/* Section 2: Contact Type */}
-      <FormSection
-        number={2}
-        title="Tipo de Solicitação"
-        subtitle="Selecione o motivo do seu contato"
-      >
-        <ContactTypeSelector
-          selectedType={formData.contactType}
-          onSelect={(type) => setFormData((prev) => ({ ...prev, contactType: type }))}
-        />
+      <FormSection number={2} title="Tipo de Solicitação" subtitle="Selecione o motivo do seu contato">
+        <ContactTypeSelector selectedType={formData.contactType} onSelect={type => setFormData(prev => ({
+        ...prev,
+        contactType: type
+      }))} />
       </FormSection>
 
       {/* Section 3: Message Details */}
-      <FormSection
-        number={3}
-        title="Detalhes da Solicitação"
-        subtitle="Descreva sua solicitação com o máximo de detalhes"
-      >
+      <FormSection number={3} title="Detalhes da Solicitação" subtitle="Descreva sua solicitação com o máximo de detalhes">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               Assunto <span className="text-destructive">*</span>
             </label>
-            <input
-              type="text"
-              name="subject"
-              value={formData.subject}
-              onChange={handleInputChange}
-              placeholder="Resumo da sua solicitação"
-              className="input-field"
-              maxLength={200}
-            />
+            <input type="text" name="subject" value={formData.subject} onChange={handleInputChange} placeholder="Resumo da sua solicitação" className="input-field" maxLength={200} />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               Mensagem <span className="text-destructive">*</span>
             </label>
-            <textarea
-              name="message"
-              value={formData.message}
-              onChange={handleInputChange}
-              placeholder="Descreva detalhadamente sua solicitação, incluindo informações relevantes como datas, produtos, números de protocolo, etc."
-              rows={6}
-              className="input-field resize-none"
-              maxLength={2000}
-            />
+            <textarea name="message" value={formData.message} onChange={handleInputChange} placeholder="Descreva detalhadamente sua solicitação, incluindo informações relevantes como datas, produtos, números de protocolo, etc." rows={6} className="input-field resize-none" maxLength={2000} />
             <p className="text-xs text-muted-foreground mt-2 text-right">
               {formData.message.length}/2000 caracteres
             </p>
@@ -322,15 +238,11 @@ const SACForm = () => {
       </FormSection>
 
       {/* Section 4: Attachments */}
-      <FormSection
-        number={4}
-        title="Anexos (opcional)"
-        subtitle="Envie imagens ou documentos que ajudem a esclarecer sua solicitação"
-      >
-        <FileUpload
-          files={formData.files}
-          onFilesChange={(files) => setFormData((prev) => ({ ...prev, files }))}
-        />
+      <FormSection number={4} title="Anexos (opcional)" subtitle="Envie imagens ou documentos que ajudem a esclarecer sua solicitação">
+        <FileUpload files={formData.files} onFilesChange={files => setFormData(prev => ({
+        ...prev,
+        files
+      }))} />
       </FormSection>
 
       {/* Privacy Notice & Submit */}
@@ -344,26 +256,16 @@ const SACForm = () => {
           e melhorar nossos serviços.
         </p>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="btn-primary w-full md:w-auto flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? (
-            <>
+        <button type="submit" disabled={isSubmitting} className="btn-primary w-full md:w-auto flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+          {isSubmitting ? <>
               <Loader2 className="w-5 h-5 animate-spin" />
               Enviando...
-            </>
-          ) : (
-            <>
+            </> : <>
               <Send className="w-5 h-5" />
               Enviar Solicitação
-            </>
-          )}
+            </>}
         </button>
       </div>
-    </form>
-  );
+    </form>;
 };
-
 export default SACForm;
