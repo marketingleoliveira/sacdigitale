@@ -553,34 +553,26 @@ export default function AdminDashboard() {
 
                   {selectedRequest.contact_type === 'reclamacao' && (
                     <div>
-                      <Label className="text-muted-foreground text-xs">Procedência</Label>
+                      <Label className="text-muted-foreground text-xs">Alterar Procedência</Label>
                       <div className="mt-1">
                         <Select
-                          value={selectedRequest.procedencia || 'nao_avaliado'}
-                          onValueChange={(value) => 
-                            updateRequestProcedencia(selectedRequest.id, value === 'nao_avaliado' ? null : value)
-                          }
+                          value={selectedRequest.procedencia || ''}
+                          onValueChange={(value) => updateRequestProcedencia(selectedRequest.id, value)}
                           disabled={isUpdatingProcedencia}
                         >
                           <SelectTrigger className="w-[180px]">
-                            <SelectValue />
+                            <SelectValue placeholder="Selecionar..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="nao_avaliado">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-gray-400" />
-                                Não avaliado
-                              </div>
-                            </SelectItem>
                             <SelectItem value="procedente">
                               <div className="flex items-center gap-2">
-                                <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                <CheckCircle className="h-4 w-4 text-green-500" />
                                 Procedente
                               </div>
                             </SelectItem>
                             <SelectItem value="improcedente">
                               <div className="flex items-center gap-2">
-                                <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                <XCircle className="h-4 w-4 text-red-500" />
                                 Improcedente
                               </div>
                             </SelectItem>
