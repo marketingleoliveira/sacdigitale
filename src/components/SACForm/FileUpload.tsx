@@ -1,4 +1,4 @@
-import { Upload, X, FileText, Image } from "lucide-react";
+import { Upload, X, FileText, Image, Video } from "lucide-react";
 import { useRef, useState } from "react";
 
 interface FileUploadProps {
@@ -33,8 +33,9 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
   const addFiles = (newFiles: File[]) => {
     const validFiles = newFiles.filter(
       (file) =>
-        file.size <= 100 * 1024 * 1024 && // 100MB limit
-        (file.type.startsWith("image/") || file.type === "application/pdf")
+        file.type.startsWith("image/") || 
+        file.type.startsWith("video/") || 
+        file.type === "application/pdf"
     );
     const updatedFiles = [...files, ...validFiles].slice(0, maxFiles);
     onFilesChange(updatedFiles);
@@ -49,7 +50,17 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
     if (file.type.startsWith("image/")) {
       return <Image className="w-5 h-5 text-info" />;
     }
+    if (file.type.startsWith("video/")) {
+      return <Video className="w-5 h-5 text-primary" />;
+    }
     return <FileText className="w-5 h-5 text-warning" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   };
 
   return (
@@ -70,7 +81,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
           ref={inputRef}
           type="file"
           multiple
-          accept="image/*,.pdf"
+          accept="image/*,video/*,.pdf"
           onChange={(e) => addFiles(Array.from(e.target.files || []))}
           className="hidden"
         />
@@ -79,7 +90,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
           Clique para enviar ou arraste seus arquivos
         </p>
         <p className="text-sm text-muted-foreground mt-2">
-          PNG, JPG ou PDF até 100MB (máximo {maxFiles} arquivos)
+          Imagens, vídeos ou PDF (máximo {maxFiles} arquivos)
         </p>
       </div>
 
@@ -97,7 +108,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
                     {file.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {(file.size / 1024).toFixed(1)} KB
+                    {formatFileSize(file.size)}
                   </p>
                 </div>
               </div>
