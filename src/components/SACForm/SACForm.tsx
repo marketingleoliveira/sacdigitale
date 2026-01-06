@@ -39,6 +39,33 @@ const SACForm = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const uploadFiles = async (files: File[]): Promise<string[]> => {
+    const uploadedUrls: string[] = [];
+    
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `attachments/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('sac-attachments')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw new Error(`Erro ao enviar arquivo: ${file.name}`);
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('sac-attachments')
+        .getPublicUrl(filePath);
+
+      uploadedUrls.push(urlData.publicUrl);
+    }
+
+    return uploadedUrls;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -57,6 +84,13 @@ const SACForm = () => {
     setIsSubmitting(true);
 
     try {
+      // Upload files first if any
+      let attachmentUrls: string[] = [];
+      if (formData.files.length > 0) {
+        toast.info("Enviando arquivos...");
+        attachmentUrls = await uploadFiles(formData.files);
+      }
+
       const { data, error } = await supabase.functions.invoke("submit-sac", {
         body: {
           contactType: formData.contactType,
@@ -66,6 +100,7 @@ const SACForm = () => {
           orderNumber: formData.orderNumber,
           subject: formData.subject,
           message: formData.message,
+          attachments: attachmentUrls,
         },
       });
 
@@ -95,9 +130,9 @@ const SACForm = () => {
         message: "",
         files: [],
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      toast.error("Erro ao enviar solicitação. Tente novamente.");
+      toast.error(error.message || "Erro ao enviar solicitação. Tente novamente.");
     } finally {
       setIsSubmitting(false);
     }
