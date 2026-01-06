@@ -46,6 +46,11 @@ import {
   Users,
   CheckCircle,
   XCircle,
+  Paperclip,
+  FileText,
+  Image,
+  Video,
+  ExternalLink,
 } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
@@ -624,6 +629,82 @@ export default function AdminDashboard() {
                     <p className="whitespace-pre-wrap">{selectedRequest.message}</p>
                   </div>
                 </div>
+
+                {/* Attachments Preview */}
+                {selectedRequest.attachments && selectedRequest.attachments.length > 0 && (
+                  <div>
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                      <Paperclip className="h-3 w-3" />
+                      Anexos ({selectedRequest.attachments.length})
+                    </Label>
+                    <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {selectedRequest.attachments.map((url, index) => {
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(url);
+                        const isVideo = /\.(mp4|webm|mov|avi|mkv)$/i.test(url);
+                        const isPdf = /\.pdf$/i.test(url);
+                        const fileName = url.split('/').pop() || `Arquivo ${index + 1}`;
+
+                        return (
+                          <div
+                            key={index}
+                            className="relative group border rounded-lg overflow-hidden bg-card"
+                          >
+                            {isImage ? (
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                                <div className="aspect-square">
+                                  <img
+                                    src={url}
+                                    alt={`Anexo ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <ExternalLink className="h-6 w-6 text-white" />
+                                </div>
+                              </a>
+                            ) : isVideo ? (
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                                <div className="aspect-square bg-muted flex flex-col items-center justify-center p-2">
+                                  <Video className="h-8 w-8 text-muted-foreground mb-2" />
+                                  <span className="text-xs text-muted-foreground text-center truncate w-full px-2">
+                                    {fileName}
+                                  </span>
+                                </div>
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <ExternalLink className="h-6 w-6 text-white" />
+                                </div>
+                              </a>
+                            ) : isPdf ? (
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                                <div className="aspect-square bg-muted flex flex-col items-center justify-center p-2">
+                                  <FileText className="h-8 w-8 text-red-500 mb-2" />
+                                  <span className="text-xs text-muted-foreground text-center truncate w-full px-2">
+                                    {fileName}
+                                  </span>
+                                </div>
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <ExternalLink className="h-6 w-6 text-white" />
+                                </div>
+                              </a>
+                            ) : (
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                                <div className="aspect-square bg-muted flex flex-col items-center justify-center p-2">
+                                  <Image className="h-8 w-8 text-muted-foreground mb-2" />
+                                  <span className="text-xs text-muted-foreground text-center truncate w-full px-2">
+                                    {fileName}
+                                  </span>
+                                </div>
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <ExternalLink className="h-6 w-6 text-white" />
+                                </div>
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Laudos Section - Only for reclamacao */}
                 {selectedRequest.contact_type === 'reclamacao' && (
