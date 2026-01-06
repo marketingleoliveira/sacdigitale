@@ -21,10 +21,12 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          laudos: string[] | null
           message: string
           name: string
           order_number: string | null
           phone: string | null
+          procedencia: string | null
           protocol: string
           status: string
         }
@@ -34,10 +36,12 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          laudos?: string[] | null
           message: string
           name: string
           order_number?: string | null
           phone?: string | null
+          procedencia?: string | null
           protocol: string
           status?: string
         }
@@ -47,10 +51,12 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          laudos?: string[] | null
           message?: string
           name?: string
           order_number?: string | null
           phone?: string | null
+          procedencia?: string | null
           protocol?: string
           status?: string
         }
