@@ -10,9 +10,9 @@ interface SACRequest {
   contactType: string;
   name: string;
   email: string;
-  phone?: string;
-  orderNumber?: string;
-  subject?: string;
+  phone: string;
+  orderNumber: string;
+  subject: string;
   message: string;
 }
 
