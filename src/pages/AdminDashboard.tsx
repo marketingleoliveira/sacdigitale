@@ -81,6 +81,7 @@ export default function AdminDashboard() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [procedenciaFilter, setProcedenciaFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -112,8 +113,16 @@ export default function AdminDashboard() {
       filtered = filtered.filter((r) => r.status === statusFilter);
     }
 
+    if (procedenciaFilter !== 'all') {
+      if (procedenciaFilter === 'nao_avaliado') {
+        filtered = filtered.filter((r) => r.contact_type === 'reclamacao' && !r.procedencia);
+      } else {
+        filtered = filtered.filter((r) => r.procedencia === procedenciaFilter);
+      }
+    }
+
     setFilteredRequests(filtered);
-  }, [requests, searchTerm, typeFilter, statusFilter]);
+  }, [requests, searchTerm, typeFilter, statusFilter, procedenciaFilter]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -136,6 +145,7 @@ export default function AdminDashboard() {
     setSearchTerm('');
     setTypeFilter('all');
     setStatusFilter('all');
+    setProcedenciaFilter('all');
   };
 
   const updateRequestStatus = async (requestId: string, newStatus: string) => {
@@ -309,7 +319,7 @@ export default function AdminDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div className="md:col-span-2">
                     <Label htmlFor="search" className="sr-only">Buscar</Label>
                     <div className="relative">
@@ -340,9 +350,10 @@ export default function AdminDashboard() {
                     </Select>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div>
+                    <Label htmlFor="status-filter" className="sr-only">Status</Label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger id="status-filter" className="flex-1">
+                      <SelectTrigger id="status-filter">
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -352,7 +363,31 @@ export default function AdminDashboard() {
                         <SelectItem value="resolvido">Resolvido</SelectItem>
                       </SelectContent>
                     </Select>
-                    {(searchTerm || typeFilter !== 'all' || statusFilter !== 'all') && (
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Select value={procedenciaFilter} onValueChange={setProcedenciaFilter}>
+                      <SelectTrigger id="procedencia-filter" className="flex-1">
+                        <SelectValue placeholder="Procedência" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas procedências</SelectItem>
+                        <SelectItem value="procedente">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            Procedente
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="improcedente">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            Improcedente
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="nao_avaliado">Não avaliado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(searchTerm || typeFilter !== 'all' || statusFilter !== 'all' || procedenciaFilter !== 'all') && (
                       <Button variant="ghost" size="icon" onClick={clearFilters}>
                         <X className="h-4 w-4" />
                       </Button>
