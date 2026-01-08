@@ -104,37 +104,32 @@ export default function UserManagement() {
 
     setIsSubmitting(true);
     try {
-      // Create user via signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newEmail,
-        password: newPassword,
-        options: {
-          emailRedirectTo: `${window.location.origin}/admin`,
-        },
-      });
+      // Get current session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
 
-      if (authError) {
-        if (authError.message.includes('already registered')) {
-          toast({
-            title: 'Erro',
-            description: 'Este e-mail já está cadastrado.',
-            variant: 'destructive',
-          });
-          return;
+      if (!token) {
+        throw new Error('Sessão não encontrada');
+      }
+
+      // Call edge function to create admin user (doesn't affect current session)
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ email: newEmail, password: newPassword }),
         }
-        throw authError;
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao criar administrador');
       }
-
-      if (!authData.user) {
-        throw new Error('Usuário não foi criado');
-      }
-
-      // Add admin role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: authData.user.id, role: 'admin' });
-
-      if (roleError) throw roleError;
 
       toast({
         title: 'Sucesso',
@@ -149,7 +144,7 @@ export default function UserManagement() {
       console.error('Error adding admin:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível adicionar o administrador.',
+        description: error instanceof Error ? error.message : 'Não foi possível adicionar o administrador.',
         variant: 'destructive',
       });
     } finally {
