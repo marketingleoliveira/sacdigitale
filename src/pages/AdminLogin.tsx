@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, LogOut } from 'lucide-react';
 import { z } from 'zod';
 import logoBlue from '@/assets/logo-blue.png';
 
@@ -16,7 +16,7 @@ const loginSchema = z.object({
 });
 
 export default function AdminLogin() {
-  const { user, isLoading, isAdmin, signIn } = useAuth();
+  const { user, isLoading, isAdmin, signIn, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +45,15 @@ export default function AdminLogin() {
             <CardTitle>Acesso Negado</CardTitle>
             <CardDescription>
               Você não tem permissão de administrador para acessar este painel.
+              Entre em contato com um administrador para obter acesso.
             </CardDescription>
           </CardHeader>
+          <CardContent className="flex justify-center">
+            <Button variant="outline" onClick={signOut} className="gap-2">
+              <LogOut className="h-4 w-4" />
+              Sair e tentar outra conta
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
