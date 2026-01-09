@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useInactivityLogout } from '@/hooks/useInactivityLogout';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ import {
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import LaudosUpload from '@/components/admin/LaudosUpload';
+import InactivityWarning from '@/components/admin/InactivityWarning';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -76,6 +78,10 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 
 export default function AdminDashboard() {
   const { user, isLoading: authLoading, isAdmin, signOut } = useAuth();
+  const { showWarning, remainingSeconds, dismissWarning, logout } = useInactivityLogout({
+    timeoutMinutes: 10,
+    warningMinutes: 5,
+  });
   const [requests, setRequests] = useState<SACRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<SACRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -732,6 +738,13 @@ export default function AdminDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      <InactivityWarning
+        open={showWarning}
+        remainingSeconds={remainingSeconds}
+        onDismiss={dismissWarning}
+        onLogout={logout}
+      />
     </div>
   );
 }
