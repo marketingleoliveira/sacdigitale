@@ -68,6 +68,7 @@ export type Database = {
       tickets: {
         Row: {
           assigned_to: string | null
+          author_email: string | null
           created_at: string
           created_by: string
           id: string
@@ -78,6 +79,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          author_email?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -88,6 +90,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          author_email?: string | null
           created_at?: string
           created_by?: string
           id?: string

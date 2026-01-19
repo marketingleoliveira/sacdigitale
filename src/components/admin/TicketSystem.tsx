@@ -18,18 +18,26 @@ interface Ticket {
   is_internal: boolean;
   created_at: string;
   updated_at: string;
+  author_email: string | null;
 }
 
 interface TicketSystemProps {
   sacRequestId: string;
   currentUserId: string;
+  currentUserEmail?: string;
 }
 
-export default function TicketSystem({ sacRequestId, currentUserId }: TicketSystemProps) {
+export default function TicketSystem({ sacRequestId, currentUserId, currentUserEmail }: TicketSystemProps) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+
+  const getEmailPrefix = (email: string | null): string => {
+    if (!email) return 'Admin';
+    const prefix = email.split('@')[0];
+    return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  };
 
   useEffect(() => {
     fetchTickets();
@@ -64,6 +72,7 @@ export default function TicketSystem({ sacRequestId, currentUserId }: TicketSyst
         created_by: currentUserId,
         message: newMessage.trim(),
         is_internal: true,
+        author_email: currentUserEmail || null,
       });
 
       if (error) throw error;
@@ -125,7 +134,7 @@ export default function TicketSystem({ sacRequestId, currentUserId }: TicketSyst
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant="outline" className="text-xs">
-                          Interno
+                          {getEmailPrefix(ticket.author_email)}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           {formatDate(ticket.created_at)}
