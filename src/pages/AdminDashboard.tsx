@@ -731,6 +731,7 @@ export default function AdminDashboard() {
                   <TicketSystem
                     sacRequestId={selectedRequest.id}
                     currentUserId={user.id}
+                    currentUserEmail={user.email}
                   />
                 </div>
               </div>
