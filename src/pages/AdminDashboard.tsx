@@ -291,6 +291,10 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4" />
               Usuários
             </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Relatórios
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="requests" className="space-y-6">
