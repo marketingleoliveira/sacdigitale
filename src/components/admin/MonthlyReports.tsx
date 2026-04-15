@@ -407,11 +407,12 @@ export default function MonthlyReports() {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      exportMonthCSV(stats.month, stats.monthLabel, grouped[stats.month] || [], stats);
+                      exportMonthPDF(stats.month, stats.monthLabel, grouped[stats.month] || [], stats);
                     }}
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Exportar Relatório CSV
+                    Exportar Relatório PDF
+                  </Button>
                   </Button>
                 </div>
               </CardContent>
