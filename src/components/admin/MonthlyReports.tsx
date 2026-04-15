@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Download } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
@@ -29,16 +31,18 @@ const monthNames = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
-function getMonthlyStats(requests: SACRequest[]): MonthlyStats[] {
+function groupByMonth(requests: SACRequest[]): Record<string, SACRequest[]> {
   const grouped: Record<string, SACRequest[]> = {};
-
   requests.forEach((r) => {
     const date = new Date(r.created_at);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(r);
   });
+  return grouped;
+}
 
+function getMonthlyStats(grouped: Record<string, SACRequest[]>): MonthlyStats[] {
   return Object.entries(grouped)
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([key, items]) => {
@@ -62,6 +66,80 @@ function getMonthlyStats(requests: SACRequest[]): MonthlyStats[] {
         naoAvaliados: reclamacoes.filter((r) => !r.procedencia).length,
       };
     });
+}
+
+const contactTypeLabels: Record<string, string> = {
+  reclamacao: 'Reclamação',
+  sugestao: 'Sugestão',
+  elogio: 'Elogio',
+  duvida: 'Dúvida',
+};
+
+const statusLabels: Record<string, string> = {
+  pendente: 'Pendente',
+  em_andamento: 'Em Andamento',
+  resolvido: 'Resolvido',
+};
+
+function exportMonthCSV(monthKey: string, monthLabel: string, items: SACRequest[], stats: MonthlyStats) {
+  const lines: string[] = [];
+  
+  // Header summary
+  lines.push(`Relatório SAC - ${monthLabel}`);
+  lines.push('');
+  lines.push('RESUMO');
+  lines.push(`Total de Solicitações;${stats.total}`);
+  lines.push(`Reclamações;${stats.reclamacoes}`);
+  lines.push(`Sugestões;${stats.sugestoes}`);
+  lines.push(`Elogios;${stats.elogios}`);
+  lines.push(`Dúvidas;${stats.duvidas}`);
+  lines.push('');
+  lines.push('STATUS');
+  lines.push(`Pendentes;${stats.pendentes}`);
+  lines.push(`Em Andamento;${stats.emAndamento}`);
+  lines.push(`Resolvidos;${stats.resolvidos}`);
+  lines.push('');
+  if (stats.reclamacoes > 0) {
+    lines.push('PROCEDÊNCIA DAS RECLAMAÇÕES');
+    lines.push(`Procedentes;${stats.procedentes}`);
+    lines.push(`Improcedentes;${stats.improcedentes}`);
+    lines.push(`Não Avaliados;${stats.naoAvaliados}`);
+    lines.push('');
+  }
+  
+  // Detail table
+  lines.push('DETALHAMENTO');
+  lines.push('Protocolo;Tipo;Nome;E-mail;Telefone;Nº Pedido;Assunto;Mensagem;Status;Procedência;Data');
+  
+  items.forEach((r) => {
+    const escape = (v: string | null) => {
+      if (!v) return '';
+      return `"${v.replace(/"/g, '""')}"`;
+    };
+    lines.push([
+      r.protocol,
+      contactTypeLabels[r.contact_type] || r.contact_type,
+      escape(r.name),
+      r.email,
+      r.phone || '',
+      r.order_number || '',
+      escape(r.subject),
+      escape(r.message),
+      statusLabels[r.status] || r.status,
+      r.procedencia || '',
+      new Date(r.created_at).toLocaleString('pt-BR'),
+    ].join(';'));
+  });
+
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `relatorio-sac-${monthLabel.replace(/\s/g, '-').toLowerCase()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success(`Relatório de ${monthLabel} exportado!`);
 }
 
 export default function MonthlyReports() {
@@ -90,7 +168,8 @@ export default function MonthlyReports() {
     }
   };
 
-  const monthlyStats = getMonthlyStats(requests);
+  const grouped = groupByMonth(requests);
+  const monthlyStats = getMonthlyStats(grouped);
 
   // Auto-open the first (most recent) month
   useEffect(() => {
@@ -185,6 +264,21 @@ export default function MonthlyReports() {
                     </div>
                   </div>
                 )}
+
+                {/* Export Button */}
+                <div className="pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportMonthCSV(stats.month, stats.monthLabel, grouped[stats.month] || [], stats);
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Relatório CSV
+                  </Button>
+                </div>
               </CardContent>
             </CollapsibleContent>
           </Card>
