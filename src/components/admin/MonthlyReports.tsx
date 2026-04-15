@@ -413,7 +413,6 @@ export default function MonthlyReports() {
                     <Download className="h-4 w-4 mr-2" />
                     Exportar Relatório PDF
                   </Button>
-                  </Button>
                 </div>
               </CardContent>
             </CollapsibleContent>
