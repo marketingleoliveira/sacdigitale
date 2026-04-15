@@ -264,6 +264,21 @@ export default function MonthlyReports() {
                     </div>
                   </div>
                 )}
+
+                {/* Export Button */}
+                <div className="pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportMonthCSV(stats.month, stats.monthLabel, grouped[stats.month] || [], stats);
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Relatório CSV
+                  </Button>
+                </div>
               </CardContent>
             </CollapsibleContent>
           </Card>
