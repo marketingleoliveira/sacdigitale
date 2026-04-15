@@ -517,6 +517,10 @@ export default function AdminDashboard() {
           <TabsContent value="users">
             <UserManagement />
           </TabsContent>
+
+          <TabsContent value="reports">
+            <MonthlyReports />
+          </TabsContent>
         </Tabs>
       </main>
 
