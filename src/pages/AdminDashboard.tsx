@@ -57,6 +57,7 @@ import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import LaudosUpload from '@/components/admin/LaudosUpload';
 import InactivityWarning from '@/components/admin/InactivityWarning';
+import MonthlyReports from '@/components/admin/MonthlyReports';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -290,6 +291,10 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4" />
               Usuários
             </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Relatórios
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="requests" className="space-y-6">
@@ -511,6 +516,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="users">
             <UserManagement />
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <MonthlyReports />
           </TabsContent>
         </Tabs>
       </main>
