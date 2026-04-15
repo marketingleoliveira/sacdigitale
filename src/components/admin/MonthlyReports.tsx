@@ -168,7 +168,8 @@ export default function MonthlyReports() {
     }
   };
 
-  const monthlyStats = getMonthlyStats(requests);
+  const grouped = groupByMonth(requests);
+  const monthlyStats = getMonthlyStats(grouped);
 
   // Auto-open the first (most recent) month
   useEffect(() => {
