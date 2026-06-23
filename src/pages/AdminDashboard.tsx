@@ -577,6 +577,12 @@ export default function AdminDashboard() {
                       <p className="font-medium">{selectedRequest.order_number}</p>
                     </div>
                   )}
+                  {selectedRequest.contact_type === 'reclamacao' && (selectedRequest as any).complaint_type && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Tipo da Reclamação</Label>
+                      <p className="font-medium">{(selectedRequest as any).complaint_type}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-4">
