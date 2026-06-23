@@ -8,6 +8,7 @@ const corsHeaders = {
 
 interface SACRequest {
   contactType: string;
+  complaintType?: string | null;
   name: string;
   email: string;
   phone: string;
@@ -63,6 +64,7 @@ const handler = async (req: Request): Promise<Response> => {
       .from("sac_requests")
       .insert({
         contact_type: requestData.contactType,
+        complaint_type: requestData.contactType === "reclamacao" ? (requestData.complaintType || null) : null,
         name: requestData.name,
         email: requestData.email,
         phone: requestData.phone,
