@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, UserPlus, Trash2, Users, Shield } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
@@ -40,7 +41,7 @@ interface AdminUser {
   user_id: string;
   role: 'admin' | 'user';
   created_at: string;
-  email?: string;
+  email?: string | null;
 }
 
 const emailSchema = z.string().email('E-mail inválido').max(255, 'E-mail muito longo');
@@ -55,6 +56,9 @@ export default function UserManagement() {
   const [newPassword, setNewPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
+  const [editPassword, setEditPassword] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,14 +68,25 @@ export default function UserManagement() {
   const fetchAdminUsers = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('role', 'admin')
-        .order('created_at', { ascending: false });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Sessão não encontrada');
 
-      if (error) throw error;
-      setAdminUsers(data || []);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action: 'list' }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao listar');
+      const admins = (result.users as AdminUser[]).filter((u) => u.role === 'admin');
+      setAdminUsers(admins);
     } catch (error) {
       console.error('Error fetching admin users:', error);
       toast({
@@ -184,6 +199,59 @@ export default function UserManagement() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!userToEdit) return;
+    if (editPassword.length < 6) {
+      toast({
+        title: 'Erro',
+        description: 'A senha deve ter pelo menos 6 caracteres.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Sessão não encontrada');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: 'update_password',
+            user_id: userToEdit.user_id,
+            password: editPassword,
+          }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao atualizar senha');
+
+      toast({
+        title: 'Sucesso',
+        description: 'Senha atualizada com sucesso!',
+      });
+      setEditPassword('');
+      setUserToEdit(null);
+      setIsPasswordDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating password:', error);
+      toast({
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Não foi possível atualizar a senha.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('pt-BR', {
       day: '2-digit',
@@ -220,28 +288,45 @@ export default function UserManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID do Usuário</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Cargo</TableHead>
                   <TableHead>Data de Criação</TableHead>
-                  <TableHead className="w-[80px]">Ações</TableHead>
+                  <TableHead className="w-[120px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {adminUsers.map((admin) => (
                   <TableRow key={admin.id}>
-                    <TableCell className="font-mono text-sm">
-                      {admin.user_id.slice(0, 8)}...
+                    <TableCell className="text-sm">
+                      {admin.email ?? (
+                        <span className="font-mono text-muted-foreground">
+                          {admin.user_id.slice(0, 8)}...
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                         <Shield className="h-3 w-3 mr-1" />
-                        Admin
+                        Administrador
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDate(admin.created_at)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-primary hover:text-primary hover:bg-primary/10"
+                        onClick={() => {
+                          setUserToEdit(admin);
+                          setEditPassword('');
+                          setIsPasswordDialogOpen(true);
+                        }}
+                        title="Alterar senha"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -250,6 +335,7 @@ export default function UserManagement() {
                           setUserToDelete(admin);
                           setIsDeleteDialogOpen(true);
                         }}
+                        title="Remover"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -312,6 +398,45 @@ export default function UserManagement() {
             <Button onClick={handleAddUser} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+            <DialogDescription>
+              {userToEdit?.email
+                ? `Defina uma nova senha para ${userToEdit.email}.`
+                : 'Defina uma nova senha para este administrador.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nova senha</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsPasswordDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleChangePassword} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
