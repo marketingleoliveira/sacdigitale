@@ -14,9 +14,34 @@ export type Database = {
   }
   public: {
     Tables: {
+      complaint_types: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sac_requests: {
         Row: {
           attachments: string[] | null
+          complaint_type: string | null
           contact_type: Database["public"]["Enums"]["contact_type"]
           created_at: string
           email: string
@@ -33,6 +58,7 @@ export type Database = {
         }
         Insert: {
           attachments?: string[] | null
+          complaint_type?: string | null
           contact_type: Database["public"]["Enums"]["contact_type"]
           created_at?: string
           email: string
@@ -49,6 +75,7 @@ export type Database = {
         }
         Update: {
           attachments?: string[] | null
+          complaint_type?: string | null
           contact_type?: Database["public"]["Enums"]["contact_type"]
           created_at?: string
           email?: string

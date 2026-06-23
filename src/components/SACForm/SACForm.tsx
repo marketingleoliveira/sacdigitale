@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Send, Loader2, CheckCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ interface FormData {
   phone: string;
   orderNumber: string;
   contactType: string;
+  complaintType: string;
   subject: string;
   message: string;
   files: File[];
@@ -19,16 +20,28 @@ const SACForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [protocol, setProtocol] = useState<string | null>(null);
+  const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
   const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
     phone: "",
     orderNumber: "",
     contactType: "",
+    complaintType: "",
     subject: "",
     message: "",
     files: []
   });
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from("complaint_types")
+        .select("id, name")
+        .eq("active", true)
+        .order("name", { ascending: true });
+      if (!error && data) setComplaintTypes(data as { id: string; name: string }[]);
+    })();
+  }, []);
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const {
       name,
@@ -67,6 +80,10 @@ const SACForm = () => {
       toast.error("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
+    if (formData.contactType === "reclamacao" && !formData.complaintType) {
+      toast.error("Selecione o tipo da reclamação.");
+      return;
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast.error("Por favor, insira um e-mail válido.");
@@ -86,6 +103,7 @@ const SACForm = () => {
       } = await supabase.functions.invoke("submit-sac", {
         body: {
           contactType: formData.contactType,
+          complaintType: formData.contactType === "reclamacao" ? formData.complaintType : null,
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
@@ -115,6 +133,7 @@ const SACForm = () => {
         phone: "",
         orderNumber: "",
         contactType: "",
+        complaintType: "",
         subject: "",
         message: "",
         files: []
@@ -212,8 +231,33 @@ const SACForm = () => {
       <FormSection number={2} title="Tipo de Solicitação" subtitle="Selecione o motivo do seu contato">
         <ContactTypeSelector selectedType={formData.contactType} onSelect={type => setFormData(prev => ({
         ...prev,
-        contactType: type
+        contactType: type,
+        complaintType: type === "reclamacao" ? prev.complaintType : ""
       }))} />
+        {formData.contactType === "reclamacao" && (
+          <div className="mt-6 animate-fade-in">
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Tipo da Reclamação <span className="text-destructive">*</span>
+            </label>
+            {complaintTypes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum tipo de reclamação cadastrado. Entre em contato com o administrador.
+              </p>
+            ) : (
+              <select
+                name="complaintType"
+                value={formData.complaintType}
+                onChange={handleInputChange}
+                className="input-field"
+              >
+                <option value="">Selecione o tipo de reclamação</option>
+                {complaintTypes.map((t) => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
       </FormSection>
 
       {/* Section 3: Message Details */}

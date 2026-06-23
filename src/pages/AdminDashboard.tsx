@@ -58,6 +58,7 @@ import TicketSystem from '@/components/admin/TicketSystem';
 import LaudosUpload from '@/components/admin/LaudosUpload';
 import InactivityWarning from '@/components/admin/InactivityWarning';
 import MonthlyReports from '@/components/admin/MonthlyReports';
+import ComplaintTypesManagement from '@/components/admin/ComplaintTypesManagement';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -295,6 +296,10 @@ export default function AdminDashboard() {
               <FileText className="h-4 w-4" />
               Relatórios
             </TabsTrigger>
+            <TabsTrigger value="complaint-types" className="gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Tipos de Reclamação
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="requests" className="space-y-6">
@@ -521,6 +526,10 @@ export default function AdminDashboard() {
           <TabsContent value="reports">
             <MonthlyReports />
           </TabsContent>
+
+          <TabsContent value="complaint-types">
+            <ComplaintTypesManagement />
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -566,6 +575,12 @@ export default function AdminDashboard() {
                     <div>
                       <Label className="text-muted-foreground text-xs">Nº do Pedido</Label>
                       <p className="font-medium">{selectedRequest.order_number}</p>
+                    </div>
+                  )}
+                  {selectedRequest.contact_type === 'reclamacao' && (selectedRequest as any).complaint_type && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Tipo da Reclamação</Label>
+                      <p className="font-medium">{(selectedRequest as any).complaint_type}</p>
                     </div>
                   )}
                 </div>
