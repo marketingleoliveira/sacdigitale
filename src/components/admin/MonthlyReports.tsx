@@ -289,10 +289,10 @@ function buildPeriodLabel(stats: MonthlyStats[]): string {
 async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRequest[]) {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
-  const blackColor: [number, number, number] = blackColor;
-  const blackColor: [number, number, number] = blackColor;
-  const grayColor: [number, number, number] = grayColor;
-  const blackColor: [number, number, number] = blackColor;
+  const blackColor: [number, number, number] = [0, 0, 0];
+  const grayColor: [number, number, number] = [100, 100, 100];
+  const lightGrayColor: [number, number, number] = [245, 245, 245];
+
 
   const periodLabel = buildPeriodLabel(selectedStats);
   const logoData = await loadImageAsBase64(logoWhite);
