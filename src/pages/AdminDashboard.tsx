@@ -686,6 +686,36 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
+
+                  {selectedRequest.contact_type === 'reclamacao' && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Tipo de Reclamação</Label>
+                      <div className="mt-1">
+                        <Select
+                          value={(selectedRequest as any).complaint_type || ''}
+                          onValueChange={(value) => updateRequestComplaintType(selectedRequest.id, value)}
+                          disabled={isUpdatingComplaintType}
+                        >
+                          <SelectTrigger className="w-[220px]">
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {complaintTypes.length === 0 ? (
+                              <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                Nenhum tipo cadastrado
+                              </div>
+                            ) : (
+                              complaintTypes.map((t) => (
+                                <SelectItem key={t.id} value={t.name}>
+                                  {t.name}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
