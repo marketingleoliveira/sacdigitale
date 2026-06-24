@@ -98,6 +98,7 @@ export default function AdminDashboard() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [procedenciaFilter, setProcedenciaFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [complaintTypeFilter, setComplaintTypeFilter] = useState<string>('all');
 
   useEffect(() => {
     if (user && isAdmin) {
