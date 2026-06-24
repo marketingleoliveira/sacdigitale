@@ -498,10 +498,17 @@ export default function AdminDashboard() {
                                 {request.protocol}
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className={typeConf.color}>
-                                  <TypeIcon className="h-3 w-3 mr-1" />
-                                  {typeConf.label}
-                                </Badge>
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="outline" className={typeConf.color}>
+                                    <TypeIcon className="h-3 w-3 mr-1" />
+                                    {typeConf.label}
+                                  </Badge>
+                                  {request.contact_type === 'reclamacao' && request.complaint_type && (
+                                    <span className="text-xs text-red-600 font-medium">
+                                      {request.complaint_type}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="font-medium">{request.name}</TableCell>
                               <TableCell className="text-muted-foreground">
