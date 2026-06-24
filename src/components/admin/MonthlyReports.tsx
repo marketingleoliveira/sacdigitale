@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import logoBlue from '@/assets/logo-blue.png';
+import logoWhite from '@/assets/logo-white.png';
 import type { Database } from '@/integrations/supabase/types';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
@@ -105,15 +105,15 @@ async function loadImageAsBase64(src: string): Promise<string> {
 async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRequest[], stats: MonthlyStats) {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
-  const primaryColor: [number, number, number] = [30, 64, 175]; // blue-700
-  const darkColor: [number, number, number] = [15, 23, 42]; // slate-900
-  const grayColor: [number, number, number] = [100, 116, 139]; // slate-500
+  const blackColor: [number, number, number] = [0, 0, 0];
+  const grayColor: [number, number, number] = [100, 100, 100];
+  const lightGrayColor: [number, number, number] = [245, 245, 245];
 
   // Load logo
-  const logoData = await loadImageAsBase64(logoBlue);
+  const logoData = await loadImageAsBase64(logoWhite);
 
   // Header bar
-  doc.setFillColor(...primaryColor);
+  doc.setFillColor(...blackColor);
   doc.rect(0, 0, pageWidth, 36, 'F');
 
   // Logo
@@ -139,7 +139,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   // Summary cards
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...darkColor);
+  doc.setTextColor(...blackColor);
   doc.text('Resumo Geral', 14, y);
   y += 8;
 
@@ -156,9 +156,9 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     head: [['Indicador', 'Quantidade']],
     body: summaryData,
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-    bodyStyles: { fontSize: 10, textColor: darkColor },
-    alternateRowStyles: { fillColor: [241, 245, 249] },
+    headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    bodyStyles: { fontSize: 10, textColor: blackColor },
+    alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
     margin: { left: 14, right: 14 },
     tableWidth: pageWidth - 28,
@@ -169,7 +169,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   // Status section
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...darkColor);
+  doc.setTextColor(...blackColor);
   doc.text('Status das Solicitações', 14, y);
   y += 8;
 
@@ -182,9 +182,9 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
       ['Resolvidos', String(stats.resolvidos)],
     ],
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-    bodyStyles: { fontSize: 10, textColor: darkColor },
-    alternateRowStyles: { fillColor: [241, 245, 249] },
+    headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    bodyStyles: { fontSize: 10, textColor: blackColor },
+    alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
     margin: { left: 14, right: 14 },
     tableWidth: pageWidth - 28,
@@ -196,7 +196,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   if (stats.reclamacoes > 0) {
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...darkColor);
+    doc.setTextColor(...blackColor);
     doc.text('Procedência das Reclamações', 14, y);
     y += 8;
 
@@ -209,9 +209,9 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
         ['Não Avaliados', String(stats.naoAvaliados)],
       ],
       theme: 'grid',
-      headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-      bodyStyles: { fontSize: 10, textColor: darkColor },
-      alternateRowStyles: { fillColor: [241, 245, 249] },
+      headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+      bodyStyles: { fontSize: 10, textColor: blackColor },
+      alternateRowStyles: { fillColor: lightGrayColor },
       columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
       margin: { left: 14, right: 14 },
       tableWidth: pageWidth - 28,
@@ -224,7 +224,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   doc.addPage();
 
   // Mini header on new page
-  doc.setFillColor(...primaryColor);
+  doc.setFillColor(...blackColor);
   doc.rect(0, 0, pageWidth, 14, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
@@ -247,9 +247,9 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     head: [['Protocolo', 'Tipo', 'Tipo Reclamação', 'Nome', 'E-mail', 'Status', 'Procedência', 'Data']],
     body: detailBody,
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-    bodyStyles: { fontSize: 7.5, textColor: darkColor },
-    alternateRowStyles: { fillColor: [241, 245, 249] },
+    headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+    bodyStyles: { fontSize: 7.5, textColor: blackColor },
+    alternateRowStyles: { fillColor: lightGrayColor },
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
     columnStyles: {
@@ -289,16 +289,16 @@ function buildPeriodLabel(stats: MonthlyStats[]): string {
 async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRequest[]) {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
-  const primaryColor: [number, number, number] = [30, 64, 175];
-  const darkColor: [number, number, number] = [15, 23, 42];
-  const grayColor: [number, number, number] = [100, 116, 139];
-  const dangerColor: [number, number, number] = [185, 28, 28];
+  const blackColor: [number, number, number] = [0, 0, 0];
+  const grayColor: [number, number, number] = [100, 100, 100];
+  const lightGrayColor: [number, number, number] = [245, 245, 245];
+
 
   const periodLabel = buildPeriodLabel(selectedStats);
-  const logoData = await loadImageAsBase64(logoBlue);
+  const logoData = await loadImageAsBase64(logoWhite);
 
   // Header
-  doc.setFillColor(...primaryColor);
+  doc.setFillColor(...blackColor);
   doc.rect(0, 0, pageWidth, 36, 'F');
   if (logoData) doc.addImage(logoData, 'PNG', 14, 6, 40, 24);
   doc.setTextColor(255, 255, 255);
@@ -334,7 +334,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...darkColor);
+  doc.setTextColor(...blackColor);
   doc.text('Visão Geral do Período', 14, y);
   y += 6;
 
@@ -349,9 +349,9 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
       ['Dúvidas', String(totals.duvidas), totals.total ? `${((totals.duvidas / totals.total) * 100).toFixed(1)}%` : '0%'],
     ],
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-    bodyStyles: { fontSize: 10, textColor: darkColor },
-    alternateRowStyles: { fillColor: [241, 245, 249] },
+    headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    bodyStyles: { fontSize: 10, textColor: blackColor },
+    alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 1: { halign: 'center', fontStyle: 'bold' }, 2: { halign: 'center' } },
     margin: { left: 14, right: 14 },
   });
@@ -372,7 +372,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...dangerColor);
+  doc.setTextColor(...blackColor);
   doc.text('Reclamações por Frequência (foco Qualidade)', 14, y);
   y += 6;
 
@@ -396,9 +396,9 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
         String(c.pendentes),
       ]),
       theme: 'grid',
-      headStyles: { fillColor: dangerColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      bodyStyles: { fontSize: 9, textColor: darkColor },
-      alternateRowStyles: { fillColor: [254, 242, 242] },
+      headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 9, textColor: blackColor },
+      alternateRowStyles: { fillColor: lightGrayColor },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10, fontStyle: 'bold' },
         2: { halign: 'center', fontStyle: 'bold' },
@@ -416,7 +416,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     if (top3.length > 0) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...darkColor);
+      doc.setTextColor(...blackColor);
       doc.text('Pontos de atenção:', 14, y);
       y += 5;
       doc.setFont('helvetica', 'normal');
@@ -436,7 +436,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     if (y > 230) { doc.addPage(); y = 20; }
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...darkColor);
+    doc.setTextColor(...blackColor);
     doc.text('Evolução Mensal por Tipo de Reclamação', 14, y);
     y += 6;
 
@@ -468,9 +468,9 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
         return row;
       }),
       theme: 'grid',
-      headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: darkColor },
-      alternateRowStyles: { fillColor: [241, 245, 249] },
+      headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: blackColor },
+      alternateRowStyles: { fillColor: lightGrayColor },
       margin: { left: 14, right: 14 },
       styles: { halign: 'center' },
       columnStyles: { 0: { halign: 'left', cellWidth: 50 } },
@@ -482,7 +482,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
   if (y > 230) { doc.addPage(); y = 20; }
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...darkColor);
+  doc.setTextColor(...blackColor);
   doc.text('Status e Procedência', 14, y);
   y += 6;
 
@@ -498,16 +498,16 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
       ['Reclamações não avaliadas', String(totals.naoAvaliados)],
     ],
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-    bodyStyles: { fontSize: 10, textColor: darkColor },
-    alternateRowStyles: { fillColor: [241, 245, 249] },
+    headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    bodyStyles: { fontSize: 10, textColor: blackColor },
+    alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 1: { halign: 'center', fontStyle: 'bold', cellWidth: 40 } },
     margin: { left: 14, right: 14 },
   });
 
   // Detalhe — apenas reclamações
   doc.addPage();
-  doc.setFillColor(...primaryColor);
+  doc.setFillColor(...blackColor);
   doc.rect(0, 0, pageWidth, 14, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
@@ -530,9 +530,9 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     head: [['Protocolo', 'Tipo de Reclamação', 'Empresa', 'Status', 'Procedência', 'Data']],
     body: detailBody.length > 0 ? detailBody : [['—', 'Sem reclamações no período', '—', '—', '—', '—']],
     theme: 'grid',
-    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-    bodyStyles: { fontSize: 8.5, textColor: darkColor },
-    alternateRowStyles: { fillColor: [241, 245, 249] },
+    headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    bodyStyles: { fontSize: 8.5, textColor: blackColor },
+    alternateRowStyles: { fillColor: lightGrayColor },
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
     columnStyles: {
