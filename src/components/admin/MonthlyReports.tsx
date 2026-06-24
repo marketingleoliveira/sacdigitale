@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Download } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Download, BarChart3 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -283,6 +284,7 @@ export default function MonthlyReports() {
   const [requests, setRequests] = useState<SACRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
+  const [selectedMonths, setSelectedMonths] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchRequests();
@@ -319,6 +321,30 @@ export default function MonthlyReports() {
     setOpenMonths((prev) => ({ ...prev, [month]: !prev[month] }));
   };
 
+  const toggleSelected = (month: string) => {
+    setSelectedMonths((prev) => ({ ...prev, [month]: !prev[month] }));
+  };
+
+  const selectedKeys = Object.keys(selectedMonths).filter((k) => selectedMonths[k]);
+
+  const selectAll = () => {
+    const all: Record<string, boolean> = {};
+    monthlyStats.forEach((s) => (all[s.month] = true));
+    setSelectedMonths(all);
+  };
+  const clearSelection = () => setSelectedMonths({});
+
+  const exportConsolidated = async () => {
+    if (selectedKeys.length === 0) {
+      toast.error('Selecione ao menos um mês.');
+      return;
+    }
+    const sortedKeys = [...selectedKeys].sort();
+    const selectedStats = monthlyStats.filter((s) => selectedMonths[s.month]);
+    const items = sortedKeys.flatMap((k) => grouped[k] || []);
+    await exportConsolidatedPDF(selectedStats, items);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -337,6 +363,27 @@ export default function MonthlyReports() {
 
   return (
     <div className="space-y-4">
+      <Card className="border-primary/30">
+        <CardContent className="py-4 flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <span className="font-medium">
+              {selectedKeys.length === 0
+                ? 'Selecione meses para gerar um relatório consolidado (anual ou personalizado).'
+                : `${selectedKeys.length} ${selectedKeys.length === 1 ? 'mês selecionado' : 'meses selecionados'}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={selectAll}>Selecionar todos</Button>
+            <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedKeys.length === 0}>Limpar</Button>
+            <Button size="sm" onClick={exportConsolidated} disabled={selectedKeys.length === 0}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar consolidado
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {monthlyStats.map((stats) => (
         <Collapsible
           key={stats.month}
@@ -348,6 +395,12 @@ export default function MonthlyReports() {
               <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    <span
+                      onClick={(e) => { e.stopPropagation(); toggleSelected(stats.month); }}
+                      className="flex items-center"
+                    >
+                      <Checkbox checked={!!selectedMonths[stats.month]} />
+                    </span>
                     <FileText className="h-5 w-5 text-primary" />
                     <CardTitle className="text-lg">{stats.monthLabel}</CardTitle>
                     <Badge variant="secondary">{stats.total} solicitações</Badge>
