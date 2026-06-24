@@ -382,7 +382,7 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-1">
                     <Label htmlFor="search" className="sr-only">Buscar</Label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -398,7 +398,12 @@ export default function AdminDashboard() {
 
                   <div>
                     <Label htmlFor="type-filter" className="sr-only">Tipo</Label>
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <Select value={typeFilter} onValueChange={(value) => {
+                      setTypeFilter(value);
+                      if (value !== 'reclamacao' && value !== 'all') {
+                        setComplaintTypeFilter('all');
+                      }
+                    }}>
                       <SelectTrigger id="type-filter">
                         <SelectValue placeholder="Tipo" />
                       </SelectTrigger>
@@ -427,9 +432,10 @@ export default function AdminDashboard() {
                     </Select>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div>
+                    <Label htmlFor="procedencia-filter" className="sr-only">Procedência</Label>
                     <Select value={procedenciaFilter} onValueChange={setProcedenciaFilter}>
-                      <SelectTrigger id="procedencia-filter" className="flex-1">
+                      <SelectTrigger id="procedencia-filter">
                         <SelectValue placeholder="Procedência" />
                       </SelectTrigger>
                       <SelectContent>
@@ -449,7 +455,25 @@ export default function AdminDashboard() {
                         <SelectItem value="nao_avaliado">Não avaliado</SelectItem>
                       </SelectContent>
                     </Select>
-                    {(searchTerm || typeFilter !== 'all' || statusFilter !== 'all' || procedenciaFilter !== 'all') && (
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Select
+                      value={complaintTypeFilter}
+                      onValueChange={setComplaintTypeFilter}
+                      disabled={typeFilter !== 'reclamacao' && typeFilter !== 'all'}
+                    >
+                      <SelectTrigger id="complaint-type-filter" className="flex-1">
+                        <SelectValue placeholder="Tipo de reclamação" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os tipos de reclamação</SelectItem>
+                        {complaintTypes.map((t) => (
+                          <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(searchTerm || typeFilter !== 'all' || statusFilter !== 'all' || procedenciaFilter !== 'all' || complaintTypeFilter !== 'all') && (
                       <Button variant="ghost" size="icon" onClick={clearFilters}>
                         <X className="h-4 w-4" />
                       </Button>
