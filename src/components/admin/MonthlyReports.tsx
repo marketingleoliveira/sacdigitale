@@ -233,6 +233,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   const detailBody = items.map((r) => [
     r.protocol,
     contactTypeLabels[r.contact_type] || r.contact_type,
+    r.contact_type === 'reclamacao' ? ((r as any).complaint_type || '—') : '—',
     r.name,
     r.email,
     statusLabels[r.status] || r.status,
@@ -242,7 +243,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
 
   autoTable(doc, {
     startY: 20,
-    head: [['Protocolo', 'Tipo', 'Nome', 'E-mail', 'Status', 'Procedência', 'Data']],
+    head: [['Protocolo', 'Tipo', 'Tipo Reclamação', 'Nome', 'E-mail', 'Status', 'Procedência', 'Data']],
     body: detailBody,
     theme: 'grid',
     headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -251,13 +252,14 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
     columnStyles: {
-      0: { cellWidth: 28 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 38 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 24 },
+      0: { cellWidth: 26 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 26 },
+      3: { cellWidth: 26 },
+      4: { cellWidth: 34 },
+      5: { cellWidth: 20 },
       6: { cellWidth: 22 },
+      7: { cellWidth: 20 },
     },
   });
 
