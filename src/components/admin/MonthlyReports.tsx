@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Download } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Download, BarChart3 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -279,10 +280,295 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   toast.success(`Relatório PDF de ${monthLabel} exportado!`);
 }
 
+function buildPeriodLabel(stats: MonthlyStats[]): string {
+  const sorted = [...stats].sort((a, b) => a.month.localeCompare(b.month));
+  if (sorted.length === 1) return sorted[0].monthLabel;
+  return `${sorted[0].monthLabel} — ${sorted[sorted.length - 1].monthLabel}`;
+}
+
+async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRequest[]) {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const primaryColor: [number, number, number] = [30, 64, 175];
+  const darkColor: [number, number, number] = [15, 23, 42];
+  const grayColor: [number, number, number] = [100, 116, 139];
+  const dangerColor: [number, number, number] = [185, 28, 28];
+
+  const periodLabel = buildPeriodLabel(selectedStats);
+  const logoData = await loadImageAsBase64(logoBlue);
+
+  // Header
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 36, 'F');
+  if (logoData) doc.addImage(logoData, 'PNG', 14, 6, 40, 24);
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Relatório Consolidado SAC', pageWidth - 14, 16, { align: 'right' });
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.text(periodLabel, pageWidth - 14, 23, { align: 'right' });
+  doc.setFontSize(8);
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth - 14, 30, { align: 'right' });
+
+  let y = 46;
+
+  // Totals
+  const totals = selectedStats.reduce(
+    (acc, s) => {
+      acc.total += s.total;
+      acc.reclamacoes += s.reclamacoes;
+      acc.sugestoes += s.sugestoes;
+      acc.elogios += s.elogios;
+      acc.duvidas += s.duvidas;
+      acc.pendentes += s.pendentes;
+      acc.emAndamento += s.emAndamento;
+      acc.resolvidos += s.resolvidos;
+      acc.procedentes += s.procedentes;
+      acc.improcedentes += s.improcedentes;
+      acc.naoAvaliados += s.naoAvaliados;
+      return acc;
+    },
+    { total: 0, reclamacoes: 0, sugestoes: 0, elogios: 0, duvidas: 0, pendentes: 0, emAndamento: 0, resolvidos: 0, procedentes: 0, improcedentes: 0, naoAvaliados: 0 }
+  );
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkColor);
+  doc.text('Visão Geral do Período', 14, y);
+  y += 6;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Indicador', 'Total', '%']],
+    body: [
+      ['Total de Solicitações', String(totals.total), '100%'],
+      ['Reclamações', String(totals.reclamacoes), totals.total ? `${((totals.reclamacoes / totals.total) * 100).toFixed(1)}%` : '0%'],
+      ['Sugestões', String(totals.sugestoes), totals.total ? `${((totals.sugestoes / totals.total) * 100).toFixed(1)}%` : '0%'],
+      ['Elogios', String(totals.elogios), totals.total ? `${((totals.elogios / totals.total) * 100).toFixed(1)}%` : '0%'],
+      ['Dúvidas', String(totals.duvidas), totals.total ? `${((totals.duvidas / totals.total) * 100).toFixed(1)}%` : '0%'],
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    bodyStyles: { fontSize: 10, textColor: darkColor },
+    alternateRowStyles: { fillColor: [241, 245, 249] },
+    columnStyles: { 1: { halign: 'center', fontStyle: 'bold' }, 2: { halign: 'center' } },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // === FOCO QUALIDADE: Ranking por tipo de reclamação ===
+  const reclamacoes = items.filter((r) => r.contact_type === 'reclamacao');
+  const typeCount: Record<string, { total: number; procedentes: number; improcedentes: number; pendentes: number }> = {};
+  reclamacoes.forEach((r) => {
+    const t = (r as any).complaint_type || 'Não classificada';
+    if (!typeCount[t]) typeCount[t] = { total: 0, procedentes: 0, improcedentes: 0, pendentes: 0 };
+    typeCount[t].total += 1;
+    if (r.procedencia === 'procedente') typeCount[t].procedentes += 1;
+    else if (r.procedencia === 'improcedente') typeCount[t].improcedentes += 1;
+    else typeCount[t].pendentes += 1;
+  });
+  const ranking = Object.entries(typeCount).sort((a, b) => b[1].total - a[1].total);
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...dangerColor);
+  doc.text('Reclamações por Frequência (foco Qualidade)', 14, y);
+  y += 6;
+
+  if (ranking.length === 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...grayColor);
+    doc.text('Nenhuma reclamação registrada no período selecionado.', 14, y);
+    y += 8;
+  } else {
+    autoTable(doc, {
+      startY: y,
+      head: [['#', 'Tipo de Reclamação', 'Qtd', '% do total', 'Procedentes', 'Improcedentes', 'Não avaliadas']],
+      body: ranking.map(([type, c], i) => [
+        String(i + 1),
+        type,
+        String(c.total),
+        totals.reclamacoes ? `${((c.total / totals.reclamacoes) * 100).toFixed(1)}%` : '0%',
+        String(c.procedentes),
+        String(c.improcedentes),
+        String(c.pendentes),
+      ]),
+      theme: 'grid',
+      headStyles: { fillColor: dangerColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 9, textColor: darkColor },
+      alternateRowStyles: { fillColor: [254, 242, 242] },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 10, fontStyle: 'bold' },
+        2: { halign: 'center', fontStyle: 'bold' },
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' },
+        6: { halign: 'center' },
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+
+    // Top 3 destaque
+    const top3 = ranking.slice(0, 3);
+    if (top3.length > 0) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...darkColor);
+      doc.text('Pontos de atenção:', 14, y);
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      top3.forEach(([type, c]) => {
+        const pct = totals.reclamacoes ? ((c.total / totals.reclamacoes) * 100).toFixed(1) : '0';
+        const line = `• ${type}: ${c.total} ocorrência(s) (${pct}%) — ${c.procedentes} procedente(s).`;
+        doc.text(line, 16, y);
+        y += 5;
+      });
+      y += 3;
+    }
+  }
+
+  // Evolução mensal (tipo x mês) — só se mais de 1 mês
+  if (selectedStats.length > 1 && ranking.length > 0) {
+    if (y > 230) { doc.addPage(); y = 20; }
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkColor);
+    doc.text('Evolução Mensal por Tipo de Reclamação', 14, y);
+    y += 6;
+
+    const sortedStats = [...selectedStats].sort((a, b) => a.month.localeCompare(b.month));
+    const monthKeys = sortedStats.map((s) => s.month);
+    const shortLabels = sortedStats.map((s) => s.monthLabel.replace(/(\w{3})\w*\s(\d{4})/, '$1/$2'));
+
+    const matrix: Record<string, Record<string, number>> = {};
+    reclamacoes.forEach((r) => {
+      const t = (r as any).complaint_type || 'Não classificada';
+      const d = new Date(r.created_at);
+      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!matrix[t]) matrix[t] = {};
+      matrix[t][k] = (matrix[t][k] || 0) + 1;
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Tipo', ...shortLabels, 'Total']],
+      body: ranking.map(([type]) => {
+        const row = [type];
+        let total = 0;
+        monthKeys.forEach((mk) => {
+          const v = matrix[type]?.[mk] || 0;
+          total += v;
+          row.push(String(v));
+        });
+        row.push(String(total));
+        return row;
+      }),
+      theme: 'grid',
+      headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: darkColor },
+      alternateRowStyles: { fillColor: [241, 245, 249] },
+      margin: { left: 14, right: 14 },
+      styles: { halign: 'center' },
+      columnStyles: { 0: { halign: 'left', cellWidth: 50 } },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
+
+  // Status & Procedência
+  if (y > 230) { doc.addPage(); y = 20; }
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkColor);
+  doc.text('Status e Procedência', 14, y);
+  y += 6;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Categoria', 'Quantidade']],
+    body: [
+      ['Pendentes', String(totals.pendentes)],
+      ['Em Andamento', String(totals.emAndamento)],
+      ['Resolvidos', String(totals.resolvidos)],
+      ['Reclamações procedentes', String(totals.procedentes)],
+      ['Reclamações improcedentes', String(totals.improcedentes)],
+      ['Reclamações não avaliadas', String(totals.naoAvaliados)],
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+    bodyStyles: { fontSize: 10, textColor: darkColor },
+    alternateRowStyles: { fillColor: [241, 245, 249] },
+    columnStyles: { 1: { halign: 'center', fontStyle: 'bold', cellWidth: 40 } },
+    margin: { left: 14, right: 14 },
+  });
+
+  // Detalhe — apenas reclamações
+  doc.addPage();
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 14, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Detalhamento de Reclamações — ${periodLabel}`, 14, 10);
+
+  const detailBody = reclamacoes
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map((r) => [
+      r.protocol,
+      (r as any).complaint_type || 'Não classificada',
+      r.name,
+      statusLabels[r.status] || r.status,
+      r.procedencia || '—',
+      new Date(r.created_at).toLocaleDateString('pt-BR'),
+    ]);
+
+  autoTable(doc, {
+    startY: 20,
+    head: [['Protocolo', 'Tipo de Reclamação', 'Empresa', 'Status', 'Procedência', 'Data']],
+    body: detailBody.length > 0 ? detailBody : [['—', 'Sem reclamações no período', '—', '—', '—', '—']],
+    theme: 'grid',
+    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    bodyStyles: { fontSize: 8.5, textColor: darkColor },
+    alternateRowStyles: { fillColor: [241, 245, 249] },
+    margin: { left: 10, right: 10 },
+    styles: { cellPadding: 2, overflow: 'linebreak' },
+    columnStyles: {
+      0: { cellWidth: 30 },
+      1: { cellWidth: 45 },
+      2: { cellWidth: 45 },
+      3: { cellWidth: 25 },
+      4: { cellWidth: 25 },
+      5: { cellWidth: 20 },
+    },
+  });
+
+  // Footer
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...grayColor);
+    doc.text('SAC Digitale Têxtil — Relatório consolidado para análise de qualidade', 14, pageHeight - 8);
+    doc.text(`Página ${i} de ${totalPages}`, pageWidth - 14, pageHeight - 8, { align: 'right' });
+  }
+
+  const fileLabel = selectedStats.length === 1
+    ? selectedStats[0].monthLabel.replace(/\s/g, '-').toLowerCase()
+    : `consolidado-${selectedStats.length}-meses`;
+  doc.save(`relatorio-sac-${fileLabel}.pdf`);
+  toast.success('Relatório consolidado exportado!');
+}
+
 export default function MonthlyReports() {
   const [requests, setRequests] = useState<SACRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
+  const [selectedMonths, setSelectedMonths] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchRequests();
@@ -319,6 +605,30 @@ export default function MonthlyReports() {
     setOpenMonths((prev) => ({ ...prev, [month]: !prev[month] }));
   };
 
+  const toggleSelected = (month: string) => {
+    setSelectedMonths((prev) => ({ ...prev, [month]: !prev[month] }));
+  };
+
+  const selectedKeys = Object.keys(selectedMonths).filter((k) => selectedMonths[k]);
+
+  const selectAll = () => {
+    const all: Record<string, boolean> = {};
+    monthlyStats.forEach((s) => (all[s.month] = true));
+    setSelectedMonths(all);
+  };
+  const clearSelection = () => setSelectedMonths({});
+
+  const exportConsolidated = async () => {
+    if (selectedKeys.length === 0) {
+      toast.error('Selecione ao menos um mês.');
+      return;
+    }
+    const sortedKeys = [...selectedKeys].sort();
+    const selectedStats = monthlyStats.filter((s) => selectedMonths[s.month]);
+    const items = sortedKeys.flatMap((k) => grouped[k] || []);
+    await exportConsolidatedPDF(selectedStats, items);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -337,6 +647,27 @@ export default function MonthlyReports() {
 
   return (
     <div className="space-y-4">
+      <Card className="border-primary/30">
+        <CardContent className="py-4 flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <span className="font-medium">
+              {selectedKeys.length === 0
+                ? 'Selecione meses para gerar um relatório consolidado (anual ou personalizado).'
+                : `${selectedKeys.length} ${selectedKeys.length === 1 ? 'mês selecionado' : 'meses selecionados'}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={selectAll}>Selecionar todos</Button>
+            <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedKeys.length === 0}>Limpar</Button>
+            <Button size="sm" onClick={exportConsolidated} disabled={selectedKeys.length === 0}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar consolidado
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {monthlyStats.map((stats) => (
         <Collapsible
           key={stats.month}
@@ -348,6 +679,12 @@ export default function MonthlyReports() {
               <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    <span
+                      onClick={(e) => { e.stopPropagation(); toggleSelected(stats.month); }}
+                      className="flex items-center"
+                    >
+                      <Checkbox checked={!!selectedMonths[stats.month]} />
+                    </span>
                     <FileText className="h-5 w-5 text-primary" />
                     <CardTitle className="text-lg">{stats.monthLabel}</CardTitle>
                     <Badge variant="secondary">{stats.total} solicitações</Badge>
