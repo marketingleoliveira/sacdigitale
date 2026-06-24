@@ -98,6 +98,7 @@ export default function AdminDashboard() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [procedenciaFilter, setProcedenciaFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [complaintTypeFilter, setComplaintTypeFilter] = useState<string>('all');
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -137,8 +138,12 @@ export default function AdminDashboard() {
       }
     }
 
+    if (complaintTypeFilter !== 'all') {
+      filtered = filtered.filter((r) => r.contact_type === 'reclamacao' && r.complaint_type === complaintTypeFilter);
+    }
+
     setFilteredRequests(filtered);
-  }, [requests, searchTerm, typeFilter, statusFilter, procedenciaFilter]);
+  }, [requests, searchTerm, typeFilter, statusFilter, procedenciaFilter, complaintTypeFilter]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
