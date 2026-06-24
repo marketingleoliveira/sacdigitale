@@ -105,15 +105,15 @@ async function loadImageAsBase64(src: string): Promise<string> {
 async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRequest[], stats: MonthlyStats) {
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
-  const primaryColor: [number, number, number] = [30, 64, 175]; // blue-700
-  const darkColor: [number, number, number] = [15, 23, 42]; // slate-900
-  const grayColor: [number, number, number] = [100, 116, 139]; // slate-500
+  const blackColor: [number, number, number] = [0, 0, 0];
+  const grayColor: [number, number, number] = [100, 100, 100];
+  const lightGrayColor: [number, number, number] = [245, 245, 245];
 
   // Load logo
-  const logoData = await loadImageAsBase64(logoBlue);
+  const logoData = await loadImageAsBase64(logoWhite);
 
   // Header bar
-  doc.setFillColor(...primaryColor);
+  doc.setFillColor(...blackColor);
   doc.rect(0, 0, pageWidth, 36, 'F');
 
   // Logo
