@@ -199,6 +199,7 @@ export default function AdminDashboard() {
     setTypeFilter('all');
     setStatusFilter('all');
     setProcedenciaFilter('all');
+    setComplaintTypeFilter('all');
   };
 
   const updateRequestStatus = async (requestId: string, newStatus: string) => {
