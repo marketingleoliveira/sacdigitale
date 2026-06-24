@@ -90,6 +90,8 @@ export default function AdminDashboard() {
   const [selectedRequest, setSelectedRequest] = useState<SACRequest | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingProcedencia, setIsUpdatingProcedencia] = useState(false);
+  const [isUpdatingComplaintType, setIsUpdatingComplaintType] = useState(false);
+  const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,6 +102,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (user && isAdmin) {
       fetchRequests();
+      fetchComplaintTypes();
     }
   }, [user, isAdmin]);
 
@@ -151,6 +154,38 @@ export default function AdminDashboard() {
       console.error('Error fetching requests:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchComplaintTypes = async () => {
+    const { data, error } = await (supabase as any)
+      .from('complaint_types')
+      .select('id, name')
+      .eq('active', true)
+      .order('name', { ascending: true });
+    if (!error) setComplaintTypes((data as any) || []);
+  };
+
+  const updateRequestComplaintType = async (requestId: string, complaintType: string | null) => {
+    setIsUpdatingComplaintType(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('sac_requests')
+        .update({ complaint_type: complaintType })
+        .eq('id', requestId);
+      if (error) throw error;
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, complaint_type: complaintType } as any : r))
+      );
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest((prev) => (prev ? ({ ...prev, complaint_type: complaintType } as any) : null));
+      }
+      toast.success('Tipo de reclamação atualizado');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao atualizar tipo de reclamação');
+    } finally {
+      setIsUpdatingComplaintType(false);
     }
   };
 
@@ -646,6 +681,36 @@ export default function AdminDashboard() {
                                 Improcedente
                               </div>
                             </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRequest.contact_type === 'reclamacao' && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Tipo de Reclamação</Label>
+                      <div className="mt-1">
+                        <Select
+                          value={(selectedRequest as any).complaint_type || ''}
+                          onValueChange={(value) => updateRequestComplaintType(selectedRequest.id, value)}
+                          disabled={isUpdatingComplaintType}
+                        >
+                          <SelectTrigger className="w-[220px]">
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {complaintTypes.length === 0 ? (
+                              <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                Nenhum tipo cadastrado
+                              </div>
+                            ) : (
+                              complaintTypes.map((t) => (
+                                <SelectItem key={t.id} value={t.name}>
+                                  {t.name}
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
