@@ -138,8 +138,12 @@ export default function AdminDashboard() {
       }
     }
 
+    if (complaintTypeFilter !== 'all') {
+      filtered = filtered.filter((r) => r.contact_type === 'reclamacao' && r.complaint_type === complaintTypeFilter);
+    }
+
     setFilteredRequests(filtered);
-  }, [requests, searchTerm, typeFilter, statusFilter, procedenciaFilter]);
+  }, [requests, searchTerm, typeFilter, statusFilter, procedenciaFilter, complaintTypeFilter]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
