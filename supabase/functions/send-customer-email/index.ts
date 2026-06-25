@@ -1,0 +1,115 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const FROM_EMAIL = "SAC Digitale <qualidade@digitaletextil.com.br>";
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+
+    if (!resendKey) {
+      return new Response(JSON.stringify({ error: "RESEND_API_KEY não configurada" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData } = await userClient.auth.getUser();
+    const user = userData?.user;
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: role } = await admin
+      .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+    if (!role) {
+      return new Response(JSON.stringify({ error: "Apenas administradores" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { sac_request_id, to, subject, body } = await req.json();
+    if (!sac_request_id || !to || !subject || !body) {
+      return new Response(JSON.stringify({ error: "Campos obrigatórios ausentes" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get protocol for reply tracking
+    const { data: sac } = await admin
+      .from("sac_requests").select("protocol").eq("id", sac_request_id).maybeSingle();
+    const protocol = sac?.protocol ?? "";
+
+    const finalSubject = subject.includes(`[${protocol}]`) ? subject : `[${protocol}] ${subject}`;
+    const htmlBody = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.5;white-space:pre-wrap">${
+      String(body).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]!))
+    }</div><br><hr><div style="font-size:11px;color:#888">Protocolo ${protocol} — Digitale Têxtil</div>`;
+
+    const resendResp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [to],
+        subject: finalSubject,
+        html: htmlBody,
+        reply_to: FROM_EMAIL,
+      }),
+    });
+
+    const resendData = await resendResp.json();
+    if (!resendResp.ok) {
+      await admin.from("email_communications").insert({
+        sac_request_id, direction: "outbound", from_email: FROM_EMAIL, to_email: to,
+        subject: finalSubject, body, sent_by: user.id, sent_by_email: user.email,
+        status: "failed", error_message: JSON.stringify(resendData),
+      });
+      return new Response(JSON.stringify({ error: "Falha no envio", details: resendData }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    await admin.from("email_communications").insert({
+      sac_request_id, direction: "outbound", from_email: FROM_EMAIL, to_email: to,
+      subject: finalSubject, body, resend_id: resendData.id, sent_by: user.id,
+      sent_by_email: user.email, status: "sent",
+    });
+
+    return new Response(JSON.stringify({ success: true, id: resendData.id }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("send-customer-email error:", err);
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

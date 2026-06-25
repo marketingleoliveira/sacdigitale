@@ -38,6 +38,65 @@ export type Database = {
         }
         Relationships: []
       }
+      email_communications: {
+        Row: {
+          body: string
+          created_at: string
+          direction: string
+          error_message: string | null
+          from_email: string
+          id: string
+          raw_payload: Json | null
+          resend_id: string | null
+          sac_request_id: string
+          sent_by: string | null
+          sent_by_email: string | null
+          status: string
+          subject: string | null
+          to_email: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          direction: string
+          error_message?: string | null
+          from_email: string
+          id?: string
+          raw_payload?: Json | null
+          resend_id?: string | null
+          sac_request_id: string
+          sent_by?: string | null
+          sent_by_email?: string | null
+          status?: string
+          subject?: string | null
+          to_email: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          from_email?: string
+          id?: string
+          raw_payload?: Json | null
+          resend_id?: string | null
+          sac_request_id?: string
+          sent_by?: string | null
+          sent_by_email?: string | null
+          status?: string
+          subject?: string | null
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_communications_sac_request_id_fkey"
+            columns: ["sac_request_id"]
+            isOneToOne: false
+            referencedRelation: "sac_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sac_requests: {
         Row: {
           attachments: string[] | null
