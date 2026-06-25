@@ -579,7 +579,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   autoTable(doc, {
     startY: 20,
-    head: [['Protocolo', 'Tipo de Reclamação', 'Pedido NF', 'Empresa', 'Status', 'Procedência', 'Data']],
+    head: [['Protocolo', 'Tipo de Reclamação', 'Nota Fiscal', 'Empresa', 'Status', 'Procedência', 'Data']],
     body: detailBody.length > 0 ? detailBody : [['—', 'Sem reclamações no período', '—', '—', '—', '—', '—']],
     theme: 'grid',
     headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
@@ -590,10 +590,10 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     rowPageBreak: 'avoid',
     columnStyles: {
       0: { cellWidth: 32 },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 30 },
+      1: { cellWidth: 58 },
+      2: { cellWidth: 34 },
       3: { cellWidth: 60 },
-      4: { cellWidth: 30 },
+      4: { cellWidth: 28 },
       5: { cellWidth: 30 },
       6: { cellWidth: 24 },
     },
