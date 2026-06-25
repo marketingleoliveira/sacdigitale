@@ -401,6 +401,9 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
   });
   const ranking = Object.entries(typeCount).sort((a, b) => b[1].total - a[1].total);
 
+  if (ranking.length > 0) {
+    y = ensureTableFits(doc, y, ranking.length, { titleHeight: 14, rowHeight: 7 });
+  }
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...blackColor);
