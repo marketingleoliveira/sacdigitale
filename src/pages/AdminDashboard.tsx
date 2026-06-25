@@ -702,12 +702,25 @@ export default function AdminDashboard() {
                       <p className="font-medium">{selectedRequest.phone}</p>
                     </div>
                   )}
-                  {selectedRequest.order_number && (
-                    <div>
-                      <Label className="text-muted-foreground text-xs">Nº do Pedido</Label>
-                      <p className="font-medium">{selectedRequest.order_number}</p>
+                  <div className="col-span-2">
+                    <Label className="text-muted-foreground text-xs">Nota Fiscal</Label>
+                    <div className="mt-1 flex gap-2">
+                      <Input
+                        value={invoiceDraft}
+                        onChange={(e) => setInvoiceDraft(e.target.value)}
+                        placeholder="Digite a Nota Fiscal"
+                        maxLength={100}
+                        disabled={isUpdatingInvoice}
+                      />
+                      <Button
+                        onClick={() => updateRequestInvoice(selectedRequest.id, invoiceDraft)}
+                        disabled={isUpdatingInvoice || invoiceDraft.trim() === (selectedRequest.order_number || '')}
+                        size="sm"
+                      >
+                        {isUpdatingInvoice ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
+                      </Button>
                     </div>
-                  )}
+                  </div>
                   {selectedRequest.contact_type === 'reclamacao' && (selectedRequest as any).complaint_type && (
                     <div>
                       <Label className="text-muted-foreground text-xs">Tipo da Reclamação</Label>
