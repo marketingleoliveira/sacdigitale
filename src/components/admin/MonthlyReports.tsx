@@ -102,6 +102,28 @@ async function loadImageAsBase64(src: string): Promise<string> {
   });
 }
 
+// Estima a altura de uma tabela e garante que ela caiba inteira na página atual.
+// Caso contrário, adiciona uma nova página e retorna o novo Y inicial.
+function ensureTableFits(
+  doc: jsPDF,
+  startY: number,
+  rowCount: number,
+  options: { headerHeight?: number; rowHeight?: number; titleHeight?: number; topMargin?: number; bottomMargin?: number } = {}
+): number {
+  const headerHeight = options.headerHeight ?? 10;
+  const rowHeight = options.rowHeight ?? 8;
+  const titleHeight = options.titleHeight ?? 0;
+  const topMargin = options.topMargin ?? 20;
+  const bottomMargin = options.bottomMargin ?? 16;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const estimated = titleHeight + headerHeight + rowCount * rowHeight + 4;
+  if (startY + estimated > pageHeight - bottomMargin) {
+    doc.addPage();
+    return topMargin;
+  }
+  return startY;
+}
+
 async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRequest[], stats: MonthlyStats) {
   const doc = new jsPDF('l', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -137,12 +159,6 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   let y = 46;
 
   // Summary cards
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...blackColor);
-  doc.text('Resumo Geral', 14, y);
-  y += 8;
-
   const summaryData = [
     ['Total de Solicitações', String(stats.total)],
     ['Reclamações', String(stats.reclamacoes)],
@@ -150,6 +166,12 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     ['Elogios', String(stats.elogios)],
     ['Dúvidas', String(stats.duvidas)],
   ];
+  y = ensureTableFits(doc, y, summaryData.length, { titleHeight: 14 });
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...blackColor);
+  doc.text('Resumo Geral', 14, y);
+  y += 8;
 
   autoTable(doc, {
     startY: y,
@@ -162,11 +184,13 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
     margin: { left: 14, right: 14 },
     tableWidth: pageWidth - 28,
+    rowPageBreak: 'avoid',
   });
 
   y = (doc as any).lastAutoTable.finalY + 10;
 
   // Status section
+  y = ensureTableFits(doc, y, 3, { titleHeight: 14 });
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...blackColor);
@@ -188,12 +212,14 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
     margin: { left: 14, right: 14 },
     tableWidth: pageWidth - 28,
+    rowPageBreak: 'avoid',
   });
 
   y = (doc as any).lastAutoTable.finalY + 10;
 
   // Procedência (if reclamações exist)
   if (stats.reclamacoes > 0) {
+    y = ensureTableFits(doc, y, 3, { titleHeight: 14 });
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...blackColor);
@@ -215,6 +241,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
       columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
       margin: { left: 14, right: 14 },
       tableWidth: pageWidth - 28,
+      rowPageBreak: 'avoid',
     });
 
     y = (doc as any).lastAutoTable.finalY + 10;
@@ -253,6 +280,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
+    rowPageBreak: 'avoid',
     columnStyles: {
       0: { cellWidth: 28 },
       1: { cellWidth: 22 },
@@ -356,6 +384,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 1: { halign: 'center', fontStyle: 'bold' }, 2: { halign: 'center' } },
     margin: { left: 14, right: 14 },
+    rowPageBreak: 'avoid',
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
@@ -410,6 +439,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
         6: { halign: 'center' },
       },
       margin: { left: 14, right: 14 },
+      rowPageBreak: 'avoid',
     });
     y = (doc as any).lastAutoTable.finalY + 8;
 
@@ -435,7 +465,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   // Evolução mensal (tipo x mês) — só se mais de 1 mês
   if (selectedStats.length > 1 && ranking.length > 0) {
-    if (y > 230) { doc.addPage(); y = 20; }
+    y = ensureTableFits(doc, y, ranking.length + 1, { titleHeight: 14, rowHeight: 7 });
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...blackColor);
@@ -484,6 +514,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
       margin: { left: 14, right: 14 },
       styles: { halign: 'center' },
       columnStyles: { 0: { halign: 'left', cellWidth: 50 } },
+      rowPageBreak: 'avoid',
       didParseCell: (data) => {
         if (data.section === 'body' && data.row.index === evolutionBody.length - 1) {
           data.cell.styles.fontStyle = 'bold';
@@ -495,7 +526,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
   }
 
   // Status & Procedência
-  if (y > 230) { doc.addPage(); y = 20; }
+  y = ensureTableFits(doc, y, 6, { titleHeight: 14 });
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...blackColor);
@@ -519,6 +550,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 1: { halign: 'center', fontStyle: 'bold', cellWidth: 40 } },
     margin: { left: 14, right: 14 },
+    rowPageBreak: 'avoid',
   });
 
   // Detalhe — apenas reclamações
@@ -552,6 +584,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
+    rowPageBreak: 'avoid',
     columnStyles: {
       0: { cellWidth: 32 },
       1: { cellWidth: 60 },

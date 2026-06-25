@@ -53,11 +53,13 @@ import {
   Video,
   ExternalLink,
 } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import LaudosUpload from '@/components/admin/LaudosUpload';
 import InactivityWarning from '@/components/admin/InactivityWarning';
 import MonthlyReports from '@/components/admin/MonthlyReports';
+import MonthSummary from '@/components/admin/MonthSummary';
 import ComplaintTypesManagement from '@/components/admin/ComplaintTypesManagement';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
@@ -323,8 +325,12 @@ export default function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="requests" className="space-y-6">
+        <Tabs defaultValue="summary" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="summary" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Resumo
+            </TabsTrigger>
             <TabsTrigger value="requests" className="gap-2">
               <Inbox className="h-4 w-4" />
               Solicitações
@@ -342,6 +348,10 @@ export default function AdminDashboard() {
               Tipos de Reclamação
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="summary">
+            <MonthSummary />
+          </TabsContent>
 
           <TabsContent value="requests" className="space-y-6">
             {/* Stats */}
