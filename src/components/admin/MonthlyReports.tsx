@@ -159,13 +159,6 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   let y = 46;
 
   // Summary cards
-  y = ensureTableFits(doc, y, summaryData.length, { titleHeight: 14 });
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...blackColor);
-  doc.text('Resumo Geral', 14, y);
-  y += 8;
-
   const summaryData = [
     ['Total de Solicitações', String(stats.total)],
     ['Reclamações', String(stats.reclamacoes)],
@@ -173,6 +166,12 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     ['Elogios', String(stats.elogios)],
     ['Dúvidas', String(stats.duvidas)],
   ];
+  y = ensureTableFits(doc, y, summaryData.length, { titleHeight: 14 });
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...blackColor);
+  doc.text('Resumo Geral', 14, y);
+  y += 8;
 
   autoTable(doc, {
     startY: y,
@@ -185,11 +184,13 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
     margin: { left: 14, right: 14 },
     tableWidth: pageWidth - 28,
+    rowPageBreak: 'avoid',
   });
 
   y = (doc as any).lastAutoTable.finalY + 10;
 
   // Status section
+  y = ensureTableFits(doc, y, 3, { titleHeight: 14 });
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...blackColor);
@@ -211,12 +212,14 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
     margin: { left: 14, right: 14 },
     tableWidth: pageWidth - 28,
+    rowPageBreak: 'avoid',
   });
 
   y = (doc as any).lastAutoTable.finalY + 10;
 
   // Procedência (if reclamações exist)
   if (stats.reclamacoes > 0) {
+    y = ensureTableFits(doc, y, 3, { titleHeight: 14 });
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...blackColor);
@@ -238,6 +241,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
       columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } },
       margin: { left: 14, right: 14 },
       tableWidth: pageWidth - 28,
+      rowPageBreak: 'avoid',
     });
 
     y = (doc as any).lastAutoTable.finalY + 10;
