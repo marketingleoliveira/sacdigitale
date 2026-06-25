@@ -327,6 +327,10 @@ export default function AdminDashboard() {
       <main className="container mx-auto px-4 py-6">
         <Tabs defaultValue="requests" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="summary" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Resumo
+            </TabsTrigger>
             <TabsTrigger value="requests" className="gap-2">
               <Inbox className="h-4 w-4" />
               Solicitações
