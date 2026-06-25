@@ -1,9 +1,39 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
+import { createLocalJWKSet, jwtVerify } from "npm:jose@5.9.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const getRequestingUserId = async (authHeader: string) => {
+  if (!authHeader.startsWith("Bearer ")) {
+    throw new Error("Token inválido");
+  }
+
+  const token = authHeader.replace("Bearer ", "").trim();
+  if (!token) {
+    throw new Error("Token inválido");
+  }
+
+  const jwksRaw = Deno.env.get("SUPABASE_JWKS");
+  if (!jwksRaw) {
+    throw new Error("Configuração de autenticação indisponível");
+  }
+
+  const jwks = createLocalJWKSet(JSON.parse(jwksRaw));
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const { payload } = await jwtVerify(token, jwks, {
+    issuer: `${supabaseUrl}/auth/v1`,
+    audience: "authenticated",
+  });
+
+  if (!payload.sub || typeof payload.sub !== "string") {
+    throw new Error("Token inválido");
+  }
+
+  return payload.sub;
 };
 
 serve(async (req) => {
@@ -26,31 +56,16 @@ serve(async (req) => {
       });
     }
 
-    if (!authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Token inválido" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const token = authHeader.replace("Bearer ", "").trim();
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: { autoRefreshToken: false, persistSession: false },
-      }
-    );
-    const { data: userData, error: authError } = await userClient.auth.getUser(token);
-    if (authError || !userData?.user) {
+    let requestingUserId: string;
+    try {
+      requestingUserId = await getRequestingUserId(authHeader);
+    } catch (authError) {
       console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const requestingUserId = userData.user.id;
 
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
