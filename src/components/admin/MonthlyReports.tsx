@@ -455,20 +455,28 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
       matrix[t][k] = (matrix[t][k] || 0) + 1;
     });
 
+    const evolutionBody = ranking.map(([type]) => {
+      const row = [type];
+      let total = 0;
+      monthKeys.forEach((mk) => {
+        const v = matrix[type]?.[mk] || 0;
+        total += v;
+        row.push(String(v));
+      });
+      row.push(String(total));
+      return row;
+    });
+
+    const monthTotals = monthKeys.map((mk) =>
+      ranking.reduce((sum, [type]) => sum + (matrix[type]?.[mk] || 0), 0)
+    );
+    const grandTotal = monthTotals.reduce((a, b) => a + b, 0);
+    evolutionBody.push(['Total', ...monthTotals.map(String), String(grandTotal)]);
+
     autoTable(doc, {
       startY: y,
       head: [['Tipo', ...shortLabels, 'Total']],
-      body: ranking.map(([type]) => {
-        const row = [type];
-        let total = 0;
-        monthKeys.forEach((mk) => {
-          const v = matrix[type]?.[mk] || 0;
-          total += v;
-          row.push(String(v));
-        });
-        row.push(String(total));
-        return row;
-      }),
+      body: evolutionBody,
       theme: 'grid',
       headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       bodyStyles: { fontSize: 8, textColor: blackColor },
@@ -476,6 +484,12 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
       margin: { left: 14, right: 14 },
       styles: { halign: 'center' },
       columnStyles: { 0: { halign: 'left', cellWidth: 50 } },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.row.index === evolutionBody.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [220, 220, 220];
+        }
+      },
     });
     y = (doc as any).lastAutoTable.finalY + 8;
   }
