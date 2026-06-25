@@ -27,20 +27,22 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user: requestingUser }, error: authError } =
-      await supabaseAdmin.auth.getUser(token);
+    const { data: claimsData, error: authError } =
+      await supabaseAdmin.auth.getClaims(token);
 
-    if (authError || !requestingUser) {
+    if (authError || !claimsData?.claims?.sub) {
+      console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const requestingUserId = claimsData.claims.sub as string;
 
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", requestingUser.id)
+      .eq("user_id", requestingUserId)
       .eq("role", "admin")
       .maybeSingle();
 
