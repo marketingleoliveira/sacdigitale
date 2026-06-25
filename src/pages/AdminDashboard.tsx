@@ -325,7 +325,7 @@ export default function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="requests" className="space-y-6">
+        <Tabs defaultValue="summary" className="space-y-6">
           <TabsList>
             <TabsTrigger value="summary" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
@@ -348,6 +348,10 @@ export default function AdminDashboard() {
               Tipos de Reclamação
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="summary">
+            <MonthSummary />
+          </TabsContent>
 
           <TabsContent value="requests" className="space-y-6">
             {/* Stats */}
