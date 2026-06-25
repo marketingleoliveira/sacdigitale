@@ -103,7 +103,7 @@ async function loadImageAsBase64(src: string): Promise<string> {
 }
 
 async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRequest[], stats: MonthlyStats) {
-  const doc = new jsPDF('p', 'mm', 'a4');
+  const doc = new jsPDF('l', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
   const blackColor: [number, number, number] = [0, 0, 0];
   const grayColor: [number, number, number] = [100, 100, 100];
@@ -235,6 +235,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     r.protocol,
     contactTypeLabels[r.contact_type] || r.contact_type,
     r.contact_type === 'reclamacao' ? ((r as any).complaint_type || '—') : '—',
+    r.order_number || '—',
     r.name,
     r.email,
     statusLabels[r.status] || r.status,
@@ -244,7 +245,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
 
   autoTable(doc, {
     startY: 20,
-    head: [['Protocolo', 'Tipo', 'Tipo Reclamação', 'Nome', 'E-mail', 'Status', 'Procedência', 'Data']],
+    head: [['Protocolo', 'Tipo', 'Tipo Reclamação', 'Pedido NF', 'Nome', 'E-mail', 'Status', 'Procedência', 'Data']],
     body: detailBody,
     theme: 'grid',
     headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -253,14 +254,15 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
     columnStyles: {
-      0: { cellWidth: 26 },
-      1: { cellWidth: 20 },
-      2: { cellWidth: 26 },
+      0: { cellWidth: 28 },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 36 },
       3: { cellWidth: 26 },
-      4: { cellWidth: 34 },
-      5: { cellWidth: 20 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 20 },
+      4: { cellWidth: 38 },
+      5: { cellWidth: 50 },
+      6: { cellWidth: 24 },
+      7: { cellWidth: 26 },
+      8: { cellWidth: 22 },
     },
   });
 
@@ -287,7 +289,7 @@ function buildPeriodLabel(stats: MonthlyStats[]): string {
 }
 
 async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRequest[]) {
-  const doc = new jsPDF('p', 'mm', 'a4');
+  const doc = new jsPDF('l', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
   const blackColor: [number, number, number] = [0, 0, 0];
   const grayColor: [number, number, number] = [100, 100, 100];
@@ -519,6 +521,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     .map((r) => [
       r.protocol,
       (r as any).complaint_type || 'Não classificada',
+      r.order_number || '—',
       r.name,
       statusLabels[r.status] || r.status,
       r.procedencia || '—',
@@ -527,8 +530,8 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   autoTable(doc, {
     startY: 20,
-    head: [['Protocolo', 'Tipo de Reclamação', 'Empresa', 'Status', 'Procedência', 'Data']],
-    body: detailBody.length > 0 ? detailBody : [['—', 'Sem reclamações no período', '—', '—', '—', '—']],
+    head: [['Protocolo', 'Tipo de Reclamação', 'Pedido NF', 'Empresa', 'Status', 'Procedência', 'Data']],
+    body: detailBody.length > 0 ? detailBody : [['—', 'Sem reclamações no período', '—', '—', '—', '—', '—']],
     theme: 'grid',
     headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     bodyStyles: { fontSize: 8.5, textColor: blackColor },
@@ -536,12 +539,13 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
     columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 45 },
-      2: { cellWidth: 45 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 25 },
-      5: { cellWidth: 20 },
+      0: { cellWidth: 32 },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 60 },
+      4: { cellWidth: 30 },
+      5: { cellWidth: 30 },
+      6: { cellWidth: 24 },
     },
   });
 
