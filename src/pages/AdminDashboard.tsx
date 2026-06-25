@@ -58,6 +58,7 @@ import TicketSystem from '@/components/admin/TicketSystem';
 import LaudosUpload from '@/components/admin/LaudosUpload';
 import InactivityWarning from '@/components/admin/InactivityWarning';
 import MonthlyReports from '@/components/admin/MonthlyReports';
+import MonthSummary from '@/components/admin/MonthSummary';
 import ComplaintTypesManagement from '@/components/admin/ComplaintTypesManagement';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
