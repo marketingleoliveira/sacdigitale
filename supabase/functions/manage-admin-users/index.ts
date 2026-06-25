@@ -26,13 +26,23 @@ serve(async (req) => {
       });
     }
 
-    const token = authHeader.replace("Bearer ", "");
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "").trim();
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
+      {
+        global: { headers: { Authorization: authHeader } },
+        auth: { autoRefreshToken: false, persistSession: false },
+      }
     );
-    const { data: userData, error: authError } = await userClient.auth.getUser();
+    const { data: userData, error: authError } = await userClient.auth.getUser(token);
     if (authError || !userData?.user) {
       console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Token inválido" }), {
