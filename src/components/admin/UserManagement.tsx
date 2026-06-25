@@ -46,6 +46,22 @@ interface AdminUser {
 
 const emailSchema = z.string().email('E-mail inválido').max(255, 'E-mail muito longo');
 
+const getFreshAccessToken = async () => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const expiresAt = sessionData.session?.expires_at ?? 0;
+  const shouldRefresh = expiresAt * 1000 < Date.now() + 60_000;
+
+  if (!sessionData.session || shouldRefresh) {
+    const { data: refreshedData, error } = await supabase.auth.refreshSession();
+    if (error || !refreshedData.session?.access_token) {
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    return refreshedData.session.access_token;
+  }
+
+  return sessionData.session.access_token;
+};
+
 export default function UserManagement() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,9 +84,7 @@ export default function UserManagement() {
   const fetchAdminUsers = async () => {
     setIsLoading(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error('Sessão não encontrada');
+      const token = await getFreshAccessToken();
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,
@@ -119,13 +133,7 @@ export default function UserManagement() {
 
     setIsSubmitting(true);
     try {
-      // Get current session token
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      if (!token) {
-        throw new Error('Sessão não encontrada');
-      }
+      const token = await getFreshAccessToken();
 
       // Call edge function to create admin user (doesn't affect current session)
       const response = await fetch(
@@ -211,9 +219,7 @@ export default function UserManagement() {
     }
     setIsSubmitting(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error('Sessão não encontrada');
+      const token = await getFreshAccessToken();
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,
