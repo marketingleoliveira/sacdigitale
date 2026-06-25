@@ -27,17 +27,20 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: authError } =
-      await supabaseAdmin.auth.getClaims(token);
-
-    if (authError || !claimsData?.claims?.sub) {
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+    const { data: userData, error: authError } = await userClient.auth.getUser();
+    if (authError || !userData?.user) {
       console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const requestingUserId = claimsData.claims.sub as string;
+    const requestingUserId = userData.user.id;
 
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
