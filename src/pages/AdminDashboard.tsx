@@ -56,6 +56,7 @@ import {
 import { LayoutDashboard } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
+import ExternalCommunication from '@/components/admin/ExternalCommunication';
 import LaudosUpload from '@/components/admin/LaudosUpload';
 import InactivityWarning from '@/components/admin/InactivityWarning';
 import MonthlyReports from '@/components/admin/MonthlyReports';
@@ -924,13 +925,28 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Ticket System */}
+                {/* Comunicação: Tickets internos + E-mails externos */}
                 <div className="pt-4 border-t">
-                  <TicketSystem
-                    sacRequestId={selectedRequest.id}
-                    currentUserId={user.id}
-                    currentUserEmail={user.email}
-                  />
+                  <Tabs defaultValue="tickets">
+                    <TabsList>
+                      <TabsTrigger value="tickets">Tickets Internos</TabsTrigger>
+                      <TabsTrigger value="emails">Comunicação Externa</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="tickets" className="mt-4">
+                      <TicketSystem
+                        sacRequestId={selectedRequest.id}
+                        currentUserId={user.id}
+                        currentUserEmail={user.email}
+                      />
+                    </TabsContent>
+                    <TabsContent value="emails" className="mt-4">
+                      <ExternalCommunication
+                        sacRequestId={selectedRequest.id}
+                        recipientEmail={selectedRequest.email}
+                        protocol={selectedRequest.protocol}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </div>
               </div>
             </>
