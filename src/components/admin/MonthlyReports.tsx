@@ -102,6 +102,28 @@ async function loadImageAsBase64(src: string): Promise<string> {
   });
 }
 
+// Estima a altura de uma tabela e garante que ela caiba inteira na página atual.
+// Caso contrário, adiciona uma nova página e retorna o novo Y inicial.
+function ensureTableFits(
+  doc: jsPDF,
+  startY: number,
+  rowCount: number,
+  options: { headerHeight?: number; rowHeight?: number; titleHeight?: number; topMargin?: number; bottomMargin?: number } = {}
+): number {
+  const headerHeight = options.headerHeight ?? 10;
+  const rowHeight = options.rowHeight ?? 8;
+  const titleHeight = options.titleHeight ?? 0;
+  const topMargin = options.topMargin ?? 20;
+  const bottomMargin = options.bottomMargin ?? 16;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const estimated = titleHeight + headerHeight + rowCount * rowHeight + 4;
+  if (startY + estimated > pageHeight - bottomMargin) {
+    doc.addPage();
+    return topMargin;
+  }
+  return startY;
+}
+
 async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRequest[], stats: MonthlyStats) {
   const doc = new jsPDF('l', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -137,6 +159,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
   let y = 46;
 
   // Summary cards
+  y = ensureTableFits(doc, y, summaryData.length, { titleHeight: 14 });
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...blackColor);
