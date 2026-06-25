@@ -383,6 +383,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 1: { halign: 'center', fontStyle: 'bold' }, 2: { halign: 'center' } },
     margin: { left: 14, right: 14 },
+    rowPageBreak: 'avoid',
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
@@ -437,6 +438,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
         6: { halign: 'center' },
       },
       margin: { left: 14, right: 14 },
+      rowPageBreak: 'avoid',
     });
     y = (doc as any).lastAutoTable.finalY + 8;
 
@@ -462,7 +464,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   // Evolução mensal (tipo x mês) — só se mais de 1 mês
   if (selectedStats.length > 1 && ranking.length > 0) {
-    if (y > 230) { doc.addPage(); y = 20; }
+    y = ensureTableFits(doc, y, evolutionBody?.length ?? ranking.length + 1, { titleHeight: 14, rowHeight: 7 });
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...blackColor);
@@ -511,6 +513,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
       margin: { left: 14, right: 14 },
       styles: { halign: 'center' },
       columnStyles: { 0: { halign: 'left', cellWidth: 50 } },
+      rowPageBreak: 'avoid',
       didParseCell: (data) => {
         if (data.section === 'body' && data.row.index === evolutionBody.length - 1) {
           data.cell.styles.fontStyle = 'bold';
@@ -522,7 +525,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
   }
 
   // Status & Procedência
-  if (y > 230) { doc.addPage(); y = 20; }
+  y = ensureTableFits(doc, y, 6, { titleHeight: 14 });
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...blackColor);
@@ -546,6 +549,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     columnStyles: { 1: { halign: 'center', fontStyle: 'bold', cellWidth: 40 } },
     margin: { left: 14, right: 14 },
+    rowPageBreak: 'avoid',
   });
 
   // Detalhe — apenas reclamações
