@@ -94,6 +94,55 @@ export default function AdminDashboard() {
   const [isUpdatingProcedencia, setIsUpdatingProcedencia] = useState(false);
   const [isUpdatingComplaintType, setIsUpdatingComplaintType] = useState(false);
   const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
+  const [invoiceDraft, setInvoiceDraft] = useState<string>('');
+  const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
+
+  useEffect(() => {
+    setInvoiceDraft(selectedRequest?.order_number || '');
+  }, [selectedRequest?.id]);
+
+  const updateRequestInvoice = async (requestId: string, newValue: string) => {
+    const trimmed = newValue.trim();
+    const previous = selectedRequest?.order_number || '';
+    if (trimmed === previous) {
+      toast.info('Nenhuma alteração na Nota Fiscal');
+      return;
+    }
+    setIsUpdatingInvoice(true);
+    try {
+      const { error } = await supabase
+        .from('sac_requests')
+        .update({ order_number: trimmed || null })
+        .eq('id', requestId);
+      if (error) throw error;
+
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, order_number: trimmed || null } : r))
+      );
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest((prev) => (prev ? { ...prev, order_number: trimmed || null } : null));
+      }
+
+      const authorName = user?.email ? user.email.split('@')[0] : 'Admin';
+      const logMessage = `${authorName.charAt(0).toUpperCase() + authorName.slice(1)} editou a nota fiscal do pedido${previous ? ` (de "${previous}" para "${trimmed || '—'}")` : ` (definida como "${trimmed || '—'}")`}.`;
+      if (user) {
+        await supabase.from('tickets').insert({
+          sac_request_id: requestId,
+          created_by: user.id,
+          message: logMessage,
+          is_internal: true,
+          author_email: user.email || null,
+        });
+      }
+
+      toast.success('Nota Fiscal atualizada');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao atualizar Nota Fiscal');
+    } finally {
+      setIsUpdatingInvoice(false);
+    }
+  };
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
