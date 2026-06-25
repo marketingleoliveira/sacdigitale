@@ -53,6 +53,7 @@ import {
   Video,
   ExternalLink,
 } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import LaudosUpload from '@/components/admin/LaudosUpload';
