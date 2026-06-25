@@ -280,6 +280,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
+    rowPageBreak: 'avoid',
     columnStyles: {
       0: { cellWidth: 28 },
       1: { cellWidth: 22 },
@@ -583,6 +584,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     alternateRowStyles: { fillColor: lightGrayColor },
     margin: { left: 10, right: 10 },
     styles: { cellPadding: 2, overflow: 'linebreak' },
+    rowPageBreak: 'avoid',
     columnStyles: {
       0: { cellWidth: 32 },
       1: { cellWidth: 60 },
