@@ -464,7 +464,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   // Evolução mensal (tipo x mês) — só se mais de 1 mês
   if (selectedStats.length > 1 && ranking.length > 0) {
-    y = ensureTableFits(doc, y, evolutionBody?.length ?? ranking.length + 1, { titleHeight: 14, rowHeight: 7 });
+    y = ensureTableFits(doc, y, ranking.length + 1, { titleHeight: 14, rowHeight: 7 });
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...blackColor);
