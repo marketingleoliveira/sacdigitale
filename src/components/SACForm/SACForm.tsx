@@ -220,9 +220,9 @@ const SACForm = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Número do pedido <span className="text-destructive">*</span>
+              Nota Fiscal <span className="text-destructive">*</span>
             </label>
-            <input type="text" name="orderNumber" value={formData.orderNumber} onChange={handleInputChange} placeholder="Ex: #12345" className="input-field" />
+            <input type="text" name="orderNumber" value={formData.orderNumber} onChange={handleInputChange} placeholder="Ex: NF 12345 / 2025-A" className="input-field" maxLength={100} />
           </div>
         </div>
       </FormSection>
