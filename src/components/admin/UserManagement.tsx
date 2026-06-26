@@ -285,6 +285,42 @@ export default function UserManagement() {
     }
   };
 
+  const handleChangeRole = async (admin: AdminUser, newRoleValue: StaffRole) => {
+    if (admin.role === newRoleValue) return;
+    setUpdatingRoleFor(admin.user_id);
+    try {
+      const token = await getFreshAccessToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: 'update_role',
+            user_id: admin.user_id,
+            role: newRoleValue,
+          }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao atualizar cargo');
+      toast({ title: 'Sucesso', description: 'Cargo atualizado com sucesso!' });
+      fetchAdminUsers();
+    } catch (error) {
+      console.error('Error updating role:', error);
+      toast({
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Não foi possível atualizar o cargo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingRoleFor(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('pt-BR', {
       day: '2-digit',
@@ -338,10 +374,30 @@ export default function UserManagement() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Administrador
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={admin.role}
+                          disabled={updatingRoleFor === admin.user_id}
+                          onValueChange={(v) => handleChangeRole(admin, v as StaffRole)}
+                        >
+                          <SelectTrigger className="w-[170px] h-8">
+                            <SelectValue>
+                              <Badge variant="outline" className={ROLE_STYLES[admin.role] || ''}>
+                                <Shield className="h-3 w-3 mr-1" />
+                                {ROLE_LABELS[admin.role] || admin.role}
+                              </Badge>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="desenvolvedor">Desenvolvedor</SelectItem>
+                            <SelectItem value="qualidade">Qualidade</SelectItem>
+                            <SelectItem value="gerencia">Gerência</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {updatingRoleFor === admin.user_id && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDate(admin.created_at)}
@@ -417,6 +473,22 @@ export default function UserManagement() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">
+                <Briefcase className="h-3 w-3 inline mr-1" />
+                Cargo
+              </Label>
+              <Select value={newRole} onValueChange={(v) => setNewRole(v as StaffRole)}>
+                <SelectTrigger id="role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desenvolvedor">Desenvolvedor — acesso total</SelectItem>
+                  <SelectItem value="qualidade">Qualidade — sem excluir e sem usuários</SelectItem>
+                  <SelectItem value="gerencia">Gerência — sem excluir, com usuários</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
