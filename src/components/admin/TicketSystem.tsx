@@ -37,9 +37,10 @@ interface TicketSystemProps {
   sacRequestId: string;
   currentUserId: string;
   currentUserEmail?: string;
+  canDelete?: boolean;
 }
 
-export default function TicketSystem({ sacRequestId, currentUserId, currentUserEmail }: TicketSystemProps) {
+export default function TicketSystem({ sacRequestId, currentUserId, currentUserEmail, canDelete = false }: TicketSystemProps) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
@@ -167,6 +168,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
                         <span className="text-xs text-muted-foreground">
                           {formatDate(ticket.created_at)}
                         </span>
+                        {canDelete && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -200,6 +202,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        )}
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{ticket.message}</p>
                     </div>

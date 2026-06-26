@@ -2,11 +2,17 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+export type AppRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia' | 'user';
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
   isAdmin: boolean;
+  role: AppRole | null;
+  isSuperAdmin: boolean;
+  canManageUsers: boolean;
+  canDelete: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -18,26 +24,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<AppRole | null>(null);
 
-  const checkAdminRole = async (userId: string) => {
+  const fetchUserRole = async (userId: string): Promise<AppRole | null> => {
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .eq('role', 'admin')
+        .in('role', ['admin', 'desenvolvedor', 'qualidade', 'gerencia'])
         .maybeSingle();
 
       if (error) {
-        console.error('Error checking admin role:', error);
-        return false;
+        console.error('Error checking role:', error);
+        return null;
       }
 
-      return !!data;
+      return (data?.role as AppRole) ?? null;
     } catch (error) {
-      console.error('Error checking admin role:', error);
-      return false;
+      console.error('Error checking role:', error);
+      return null;
     }
   };
 
@@ -49,12 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (session?.user) {
           setTimeout(async () => {
-            const adminStatus = await checkAdminRole(session.user.id);
-            setIsAdmin(adminStatus);
+            const r = await fetchUserRole(session.user.id);
+            setRole(r);
             setIsLoading(false);
           }, 0);
         } else {
-          setIsAdmin(false);
+          setRole(null);
           setIsLoading(false);
         }
       }
@@ -65,8 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        checkAdminRole(session.user.id).then((adminStatus) => {
-          setIsAdmin(adminStatus);
+        fetchUserRole(session.user.id).then((r) => {
+          setRole(r);
           setIsLoading(false);
         });
       } else {
@@ -95,11 +101,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    setIsAdmin(false);
+    setRole(null);
   };
 
+  const isAdmin = role !== null;
+  const isSuperAdmin = role === 'admin' || role === 'desenvolvedor';
+  const canManageUsers = isSuperAdmin || role === 'gerencia';
+  const canDelete = isSuperAdmin;
+
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, isAdmin, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading, isAdmin, role, isSuperAdmin, canManageUsers, canDelete, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

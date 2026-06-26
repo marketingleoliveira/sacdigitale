@@ -94,7 +94,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function AdminDashboard() {
-  const { user, isLoading: authLoading, isAdmin, signOut } = useAuth();
+  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, signOut } = useAuth();
   const { showWarning, remainingSeconds, dismissWarning, logout } = useInactivityLogout({
     timeoutMinutes: 10,
     warningMinutes: 5,
@@ -414,10 +414,12 @@ export default function AdminDashboard() {
               <Inbox className="h-4 w-4" />
               Solicitações
             </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              Usuários
-            </TabsTrigger>
+            {canManageUsers && (
+              <TabsTrigger value="users" className="gap-2">
+                <Users className="h-4 w-4" />
+                Usuários
+              </TabsTrigger>
+            )}
             <TabsTrigger value="reports" className="gap-2">
               <FileText className="h-4 w-4" />
               Relatórios
@@ -669,6 +671,7 @@ export default function AdminDashboard() {
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
+                                  {canDelete && (
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
@@ -694,6 +697,7 @@ export default function AdminDashboard() {
                                       </AlertDialogFooter>
                                     </AlertDialogContent>
                                   </AlertDialog>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -707,9 +711,11 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
+          {canManageUsers && (
+            <TabsContent value="users">
+              <UserManagement />
+            </TabsContent>
+          )}
 
           <TabsContent value="reports">
             <MonthlyReports />
@@ -993,6 +999,7 @@ export default function AdminDashboard() {
                         sacRequestId={selectedRequest.id}
                         currentUserId={user.id}
                         currentUserEmail={user.email}
+                        canDelete={canDelete}
                       />
                     </TabsContent>
                     <TabsContent value="emails" className="mt-4">

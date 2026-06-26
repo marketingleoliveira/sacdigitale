@@ -31,18 +31,40 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, UserPlus, Trash2, Users, Shield } from 'lucide-react';
-import { KeyRound } from 'lucide-react';
+import { Loader2, UserPlus, Trash2, Users, Shield, KeyRound, Briefcase } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+
+type StaffRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia';
 
 interface AdminUser {
   id: string;
   user_id: string;
-  role: 'admin' | 'user';
+  role: StaffRole | 'user';
   created_at: string;
   email?: string | null;
 }
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Desenvolvedor',
+  desenvolvedor: 'Desenvolvedor',
+  qualidade: 'Qualidade',
+  gerencia: 'Gerência',
+};
+
+const ROLE_STYLES: Record<string, string> = {
+  admin: 'bg-purple-100 text-purple-700 border-purple-200',
+  desenvolvedor: 'bg-purple-100 text-purple-700 border-purple-200',
+  qualidade: 'bg-blue-100 text-blue-700 border-blue-200',
+  gerencia: 'bg-amber-100 text-amber-700 border-amber-200',
+};
 
 const emailSchema = z.string().email('E-mail inválido').max(255, 'E-mail muito longo');
 
@@ -70,11 +92,13 @@ export default function UserManagement() {
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState<StaffRole>('qualidade');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
   const [editPassword, setEditPassword] = useState('');
+  const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -99,8 +123,10 @@ export default function UserManagement() {
       );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao listar');
-      const admins = (result.users as AdminUser[]).filter((u) => u.role === 'admin');
-      setAdminUsers(admins);
+      const staff = (result.users as AdminUser[]).filter((u) =>
+        ['admin', 'desenvolvedor', 'qualidade', 'gerencia'].includes(u.role)
+      );
+      setAdminUsers(staff);
     } catch (error) {
       console.error('Error fetching admin users:', error);
       toast({
@@ -144,7 +170,7 @@ export default function UserManagement() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({ email: newEmail, password: newPassword }),
+          body: JSON.stringify({ email: newEmail, password: newPassword, role: newRole }),
         }
       );
 
@@ -161,6 +187,7 @@ export default function UserManagement() {
 
       setNewEmail('');
       setNewPassword('');
+      setNewRole('qualidade');
       setIsAddDialogOpen(false);
       fetchAdminUsers();
     } catch (error) {
@@ -258,6 +285,42 @@ export default function UserManagement() {
     }
   };
 
+  const handleChangeRole = async (admin: AdminUser, newRoleValue: StaffRole) => {
+    if (admin.role === newRoleValue) return;
+    setUpdatingRoleFor(admin.user_id);
+    try {
+      const token = await getFreshAccessToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: 'update_role',
+            user_id: admin.user_id,
+            role: newRoleValue,
+          }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao atualizar cargo');
+      toast({ title: 'Sucesso', description: 'Cargo atualizado com sucesso!' });
+      fetchAdminUsers();
+    } catch (error) {
+      console.error('Error updating role:', error);
+      toast({
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Não foi possível atualizar o cargo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingRoleFor(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('pt-BR', {
       day: '2-digit',
@@ -311,10 +374,30 @@ export default function UserManagement() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Administrador
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={admin.role}
+                          disabled={updatingRoleFor === admin.user_id}
+                          onValueChange={(v) => handleChangeRole(admin, v as StaffRole)}
+                        >
+                          <SelectTrigger className="w-[170px] h-8">
+                            <SelectValue>
+                              <Badge variant="outline" className={ROLE_STYLES[admin.role] || ''}>
+                                <Shield className="h-3 w-3 mr-1" />
+                                {ROLE_LABELS[admin.role] || admin.role}
+                              </Badge>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="desenvolvedor">Desenvolvedor</SelectItem>
+                            <SelectItem value="qualidade">Qualidade</SelectItem>
+                            <SelectItem value="gerencia">Gerência</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {updatingRoleFor === admin.user_id && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDate(admin.created_at)}
@@ -390,6 +473,22 @@ export default function UserManagement() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">
+                <Briefcase className="h-3 w-3 inline mr-1" />
+                Cargo
+              </Label>
+              <Select value={newRole} onValueChange={(v) => setNewRole(v as StaffRole)}>
+                <SelectTrigger id="role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desenvolvedor">Desenvolvedor — acesso total</SelectItem>
+                  <SelectItem value="qualidade">Qualidade — sem excluir e sem usuários</SelectItem>
+                  <SelectItem value="gerencia">Gerência — sem excluir, com usuários</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
