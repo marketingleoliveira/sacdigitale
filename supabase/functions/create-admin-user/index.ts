@@ -43,17 +43,17 @@ serve(async (req) => {
       );
     }
 
-    // Check if requesting user is admin
-    const { data: roleData, error: roleError } = await supabaseAdmin
+    // Only Desenvolvedor / Gerência (legacy admin) can create users
+    const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requestingUser.id)
-      .eq("role", "admin")
+      .in("role", ["admin", "desenvolvedor", "gerencia"])
       .maybeSingle();
 
-    if (roleError || !roleData) {
+    if (!roleData) {
       return new Response(
-        JSON.stringify({ error: "Apenas administradores podem criar novos usuários" }),
+        JSON.stringify({ error: "Apenas Desenvolvedor ou Gerência podem criar usuários" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
