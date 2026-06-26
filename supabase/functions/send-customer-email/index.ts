@@ -46,9 +46,11 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: role } = await admin
-      .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
-    if (!role) {
+    const { data: roles } = await admin
+      .from("user_roles").select("role").eq("user_id", user.id);
+    const allowed = ["admin", "desenvolvedor", "gerencia", "qualidade"];
+    const hasAccess = (roles ?? []).some((r: { role: string }) => allowed.includes(r.role));
+    if (!hasAccess) {
       return new Response(JSON.stringify({ error: "Apenas administradores" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
