@@ -47,7 +47,7 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
       .eq('sac_request_id', sacRequestId)
       .order('created_at', { ascending: true });
     if (error) toast.error('Erro ao carregar e-mails');
-    setEmails((data as EmailItem[]) || []);
+    setEmails(((data as unknown) as EmailItem[]) || []);
     setLoading(false);
   };
 
