@@ -40,6 +40,7 @@ export type Database = {
       }
       email_communications: {
         Row: {
+          bcc_email: string | null
           body: string
           created_at: string
           direction: string
@@ -56,6 +57,7 @@ export type Database = {
           to_email: string
         }
         Insert: {
+          bcc_email?: string | null
           body: string
           created_at?: string
           direction: string
@@ -72,6 +74,7 @@ export type Database = {
           to_email: string
         }
         Update: {
+          bcc_email?: string | null
           body?: string
           created_at?: string
           direction?: string
@@ -96,6 +99,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_settings: {
+        Row: {
+          bcc_email: string
+          bcc_enabled: boolean
+          created_at: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          bcc_email?: string
+          bcc_enabled?: boolean
+          created_at?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          bcc_email?: string
+          bcc_enabled?: boolean
+          created_at?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       sac_requests: {
         Row: {

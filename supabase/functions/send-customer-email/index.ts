@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const FROM_EMAIL = "SAC Digitale <qualidade@digitaletextil.com.br>";
+const DEFAULT_BCC_EMAIL = Deno.env.get("DEFAULT_BCC_EMAIL") ?? "gerente@digitaletextil.com.br";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -65,10 +66,30 @@ serve(async (req) => {
       .from("sac_requests").select("protocol").eq("id", sac_request_id).maybeSingle();
     const protocol = sac?.protocol ?? "";
 
+    // Load BCC settings (configurable via admin UI; falls back to env default)
+    const { data: settings } = await admin
+      .from("email_settings")
+      .select("bcc_enabled, bcc_email")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const bccEnabled = settings?.bcc_enabled ?? true;
+    const bccEmail = (settings?.bcc_email ?? DEFAULT_BCC_EMAIL)?.trim() || null;
+    const useBcc = bccEnabled && bccEmail;
+
     const finalSubject = subject.includes(`[${protocol}]`) ? subject : `[${protocol}] ${subject}`;
     const htmlBody = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.5;white-space:pre-wrap">${
       String(body).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]!))
     }</div><br><hr><div style="font-size:11px;color:#888">Protocolo ${protocol} — Digitale Têxtil</div>`;
+
+    const payload: Record<string, unknown> = {
+      from: FROM_EMAIL,
+      to: [to],
+      subject: finalSubject,
+      html: htmlBody,
+      reply_to: FROM_EMAIL,
+    };
+    if (useBcc) payload.bcc = [bccEmail];
 
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -76,19 +97,14 @@ serve(async (req) => {
         "Authorization": `Bearer ${resendKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [to],
-        subject: finalSubject,
-        html: htmlBody,
-        reply_to: FROM_EMAIL,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const resendData = await resendResp.json();
     if (!resendResp.ok) {
       await admin.from("email_communications").insert({
         sac_request_id, direction: "outbound", from_email: FROM_EMAIL, to_email: to,
+        bcc_email: useBcc ? bccEmail : null,
         subject: finalSubject, body, sent_by: user.id, sent_by_email: user.email,
         status: "failed", error_message: JSON.stringify(resendData),
       });
@@ -97,8 +113,16 @@ serve(async (req) => {
       });
     }
 
+    if (useBcc && resendData?.id) {
+      // BCC is delivered as part of the same Resend send. If Resend reports any
+      // per-recipient failure metadata in the future, log it but do not fail the
+      // customer-facing send.
+      console.log(`[send-customer-email] BCC enviado para ${bccEmail} (resend id ${resendData.id})`);
+    }
+
     await admin.from("email_communications").insert({
       sac_request_id, direction: "outbound", from_email: FROM_EMAIL, to_email: to,
+      bcc_email: useBcc ? bccEmail : null,
       subject: finalSubject, body, resend_id: resendData.id, sent_by: user.id,
       sent_by_email: user.email, status: "sent",
     });

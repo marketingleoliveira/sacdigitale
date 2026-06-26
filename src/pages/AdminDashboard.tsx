@@ -65,7 +65,7 @@ import {
   ExternalLink,
   Trash2,
 } from 'lucide-react';
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, Mail } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import ExternalCommunication from '@/components/admin/ExternalCommunication';
@@ -74,6 +74,7 @@ import InactivityWarning from '@/components/admin/InactivityWarning';
 import MonthlyReports from '@/components/admin/MonthlyReports';
 import MonthSummary from '@/components/admin/MonthSummary';
 import ComplaintTypesManagement from '@/components/admin/ComplaintTypesManagement';
+import ExternalSettings from '@/components/admin/ExternalSettings';
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -428,6 +429,12 @@ export default function AdminDashboard() {
               <AlertTriangle className="h-4 w-4" />
               Tipos de Reclamação
             </TabsTrigger>
+            {canManageUsers && (
+              <TabsTrigger value="external-settings" className="gap-2">
+                <Mail className="h-4 w-4" />
+                Configurações Externas
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="summary">
@@ -724,6 +731,12 @@ export default function AdminDashboard() {
           <TabsContent value="complaint-types">
             <ComplaintTypesManagement />
           </TabsContent>
+
+          {canManageUsers && (
+            <TabsContent value="external-settings">
+              <ExternalSettings />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 
