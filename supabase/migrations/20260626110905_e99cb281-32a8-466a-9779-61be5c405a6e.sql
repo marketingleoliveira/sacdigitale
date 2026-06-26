@@ -1,0 +1,1 @@
+CREATE POLICY "Admins can delete SAC requests" ON public.sac_requests FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
