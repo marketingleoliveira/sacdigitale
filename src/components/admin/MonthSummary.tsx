@@ -14,6 +14,9 @@ import {
   TrendingUp,
   BarChart3,
   CalendarDays,
+  Crown,
+  Briefcase,
+  ShieldCheck,
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -27,15 +30,25 @@ const monthNames = [
 export default function MonthSummary() {
   const [requests, setRequests] = useState<SACRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [roleCounts, setRoleCounts] = useState<{ desenvolvedor: number; gerencia: number; qualidade: number }>({
+    desenvolvedor: 0,
+    gerencia: 0,
+    qualidade: 0,
+  });
 
   useEffect(() => {
     (async () => {
       setIsLoading(true);
-      const { data } = await supabase
-        .from('sac_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-      setRequests(data || []);
+      const [{ data: reqs }, { data: roles }] = await Promise.all([
+        supabase.from('sac_requests').select('*').order('created_at', { ascending: false }),
+        supabase.from('user_roles').select('role'),
+      ]);
+      setRequests(reqs || []);
+      const counts = { desenvolvedor: 0, gerencia: 0, qualidade: 0 };
+      (roles || []).forEach((r: any) => {
+        if (r.role in counts) counts[r.role as keyof typeof counts]++;
+      });
+      setRoleCounts(counts);
       setIsLoading(false);
     })();
   }, []);
@@ -57,14 +70,6 @@ export default function MonthSummary() {
     });
     const ranking = Object.entries(typeCount).sort((a, b) => b[1] - a[1]);
 
-    // Daily series for current month
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const daily = Array.from({ length: daysInMonth }, (_, i) => {
-      const day = i + 1;
-      return items.filter((r) => new Date(r.created_at).getDate() === day).length;
-    });
-    const maxDaily = Math.max(1, ...daily);
-
     const today = new Date().toDateString();
     const hoje = items.filter((r) => new Date(r.created_at).toDateString() === today).length;
 
@@ -82,9 +87,6 @@ export default function MonthSummary() {
       improcedentes: reclamacoes.filter((r) => r.procedencia === 'improcedente').length,
       naoAvaliados: reclamacoes.filter((r) => !r.procedencia).length,
       ranking,
-      daily,
-      maxDaily,
-      daysInMonth,
       hoje,
     };
   }, [requests]);
@@ -158,34 +160,6 @@ export default function MonthSummary() {
         </Card>
       </div>
 
-      {/* Atividade diária */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Atividade diária</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-[3px] h-32">
-            {summary.daily.map((v, i) => {
-              const h = (v / summary.maxDaily) * 100;
-              const isToday = i + 1 === new Date().getDate();
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full" title={`Dia ${i + 1}: ${v}`}>
-                  <div
-                    className={`w-full rounded-t ${isToday ? 'bg-primary' : 'bg-primary/40'} transition-all`}
-                    style={{ height: `${h}%`, minHeight: v > 0 ? '4px' : '2px' }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-            <span>1</span>
-            <span>{Math.ceil(summary.daysInMonth / 2)}</span>
-            <span>{summary.daysInMonth}</span>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Top reclamações */}
       <Card>
         <CardHeader>
@@ -222,6 +196,80 @@ export default function MonthSummary() {
           )}
         </CardContent>
       </Card>
+
+      {/* Hierarquia de cargos */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Hierarquia de cargos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center gap-4">
+            <HierarchyNode
+              rank={1}
+              title="Desenvolvedor"
+              count={roleCounts.desenvolvedor}
+              icon={<Crown className="h-5 w-5" />}
+              gradient="from-amber-500 to-amber-700"
+              description="Super admin — acesso total"
+            />
+            <div className="w-px h-6 bg-border" />
+            <HierarchyNode
+              rank={2}
+              title="Gerência"
+              count={roleCounts.gerencia}
+              icon={<Briefcase className="h-5 w-5" />}
+              gradient="from-blue-500 to-blue-700"
+              description="Acesso completo + gestão de usuários"
+            />
+            <div className="w-px h-6 bg-border" />
+            <HierarchyNode
+              rank={3}
+              title="Qualidade"
+              count={roleCounts.qualidade}
+              icon={<ShieldCheck className="h-5 w-5" />}
+              gradient="from-emerald-500 to-emerald-700"
+              description="Operação sem exclusões"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function HierarchyNode({
+  rank,
+  title,
+  count,
+  icon,
+  gradient,
+  description,
+}: {
+  rank: number;
+  title: string;
+  count: number;
+  icon: React.ReactNode;
+  gradient: string;
+  description: string;
+}) {
+  return (
+    <div className={`w-full max-w-md rounded-lg border bg-gradient-to-r ${gradient} text-white p-4 shadow-sm`}>
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center font-bold">
+          {rank}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 font-semibold">
+            {icon}
+            {title}
+          </div>
+          <p className="text-xs text-white/80">{description}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-bold leading-none">{count}</p>
+          <p className="text-[10px] text-white/80 uppercase tracking-wide">{count === 1 ? 'usuário' : 'usuários'}</p>
+        </div>
+      </div>
     </div>
   );
 }
