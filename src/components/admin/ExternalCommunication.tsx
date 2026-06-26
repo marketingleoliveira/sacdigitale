@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Mail, MailOpen, Send, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Loader2, Mail, MailOpen, Send, ArrowDownLeft, ArrowUpRight, Paperclip, X, FileIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface EmailItem {
@@ -21,6 +21,7 @@ interface EmailItem {
   sent_by_email: string | null;
   error_message: string | null;
   created_at: string;
+  attachments?: { filename: string; url: string; size?: number; content_type?: string }[];
 }
 
 interface Props {
@@ -35,6 +36,8 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
   const [sending, setSending] = useState(false);
   const [subject, setSubject] = useState(`[${protocol}] Atualização sobre sua solicitação`);
   const [body, setBody] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -68,9 +71,26 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
     }
     setSending(true);
     try {
+      // Upload attachments to storage first
+      const uploaded: { filename: string; url: string; size: number; content_type: string }[] = [];
+      if (files.length > 0) {
+        setUploading(true);
+        for (const f of files) {
+          const path = `email-attachments/${sacRequestId}/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          const { error: upErr } = await supabase.storage.from('sac-attachments').upload(path, f, {
+            contentType: f.type || 'application/octet-stream',
+            upsert: false,
+          });
+          if (upErr) throw new Error(`Falha ao enviar ${f.name}: ${upErr.message}`);
+          const { data: signed } = await supabase.storage.from('sac-attachments').createSignedUrl(path, 60 * 60);
+          if (!signed?.signedUrl) throw new Error(`Falha ao gerar URL para ${f.name}`);
+          uploaded.push({ filename: f.name, url: signed.signedUrl, size: f.size, content_type: f.type || 'application/octet-stream' });
+        }
+        setUploading(false);
+      }
       const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke('send-customer-email', {
-        body: { sac_request_id: sacRequestId, to: recipientEmail, subject, body },
+        body: { sac_request_id: sacRequestId, to: recipientEmail, subject, body, attachments: uploaded },
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
       });
       if (error || (data as any)?.error) {
@@ -78,11 +98,13 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
       }
       toast.success('E-mail enviado ao cliente');
       setBody('');
+      setFiles([]);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erro ao enviar');
     } finally {
       setSending(false);
+      setUploading(false);
     }
   };
 
@@ -125,6 +147,16 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
                   </div>
                   {e.subject && <div className="text-sm font-medium">{e.subject}</div>}
                   <p className="text-sm whitespace-pre-wrap">{e.body}</p>
+                  {e.attachments && e.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {e.attachments.map((a, i) => (
+                        <a key={i} href={a.url} target="_blank" rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border bg-background hover:bg-muted">
+                          <FileIcon className="h-3 w-3" />{a.filename}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   {e.error_message && <p className="text-xs text-destructive">{e.error_message}</p>}
                 </CardContent>
               </Card>
@@ -148,11 +180,34 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
           className="min-h-[120px]"
           maxLength={5000}
         />
+        {files.length > 0 && (
+          <div className="space-y-1">
+            {files.map((f, i) => (
+              <div key={i} className="flex items-center justify-between text-xs bg-muted rounded px-2 py-1">
+                <span className="flex items-center gap-2 truncate"><FileIcon className="h-3 w-3" />{f.name} <span className="text-muted-foreground">({(f.size / 1024).toFixed(0)} KB)</span></span>
+                <button type="button" onClick={() => setFiles(files.filter((_, idx) => idx !== i))} className="text-destructive">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">{body.length}/5000</span>
-          <Button onClick={send} disabled={sending || !body.trim()} size="sm">
-            {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-            Enviar e-mail
+          <div className="flex items-center gap-3">
+            <label className="inline-flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline">
+              <Paperclip className="h-3 w-3" /> Anexar arquivos
+              <input type="file" multiple className="hidden"
+                onChange={(e) => {
+                  const list = Array.from(e.target.files || []);
+                  setFiles((prev) => [...prev, ...list]);
+                  e.target.value = '';
+                }} />
+            </label>
+            <span className="text-xs text-muted-foreground">{body.length}/5000</span>
+          </div>
+          <Button onClick={send} disabled={sending || uploading || !body.trim()} size="sm">
+            {sending || uploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+            {uploading ? 'Enviando anexos...' : 'Enviar e-mail'}
           </Button>
         </div>
       </div>
