@@ -67,16 +67,19 @@ serve(async (req) => {
       });
     }
 
-    const { data: roleData } = await supabaseAdmin
+    const { data: requesterRoleRow } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requestingUserId)
-      .eq("role", "admin")
+      .in("role", ["admin", "desenvolvedor", "qualidade", "gerencia"])
       .maybeSingle();
 
-    if (!roleData) {
+    const requesterRole = requesterRoleRow?.role as string | undefined;
+    const canManageUsers = requesterRole === "admin" || requesterRole === "desenvolvedor" || requesterRole === "gerencia";
+
+    if (!requesterRole) {
       return new Response(
-        JSON.stringify({ error: "Apenas administradores podem realizar esta ação" }),
+        JSON.stringify({ error: "Acesso negado" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -85,6 +88,12 @@ serve(async (req) => {
     const action = body.action as string;
 
     if (action === "list") {
+      if (!canManageUsers) {
+        return new Response(
+          JSON.stringify({ error: "Apenas Desenvolvedor ou Gerência podem listar usuários" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const { data: roles, error: rolesError } = await supabaseAdmin
         .from("user_roles")
         .select("*")
@@ -112,6 +121,12 @@ serve(async (req) => {
     }
 
     if (action === "update_password") {
+      if (!canManageUsers) {
+        return new Response(
+          JSON.stringify({ error: "Apenas Desenvolvedor ou Gerência podem alterar senhas" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const { user_id, password } = body as { user_id: string; password: string };
       if (!user_id || !password || password.length < 6) {
         return new Response(
@@ -124,6 +139,38 @@ serve(async (req) => {
         { password }
       );
       if (updErr) throw updErr;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "update_role") {
+      if (!canManageUsers) {
+        return new Response(
+          JSON.stringify({ error: "Apenas Desenvolvedor ou Gerência podem alterar cargos" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { user_id, role } = body as { user_id: string; role: string };
+      const allowed = ["desenvolvedor", "qualidade", "gerencia"];
+      if (!user_id || !allowed.includes(role)) {
+        return new Response(
+          JSON.stringify({ error: "Cargo inválido" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      // Remove existing staff roles for this user, then insert the new one
+      const { error: delErr } = await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", user_id)
+        .in("role", ["admin", "desenvolvedor", "qualidade", "gerencia"]);
+      if (delErr) throw delErr;
+      const { error: insErr } = await supabaseAdmin
+        .from("user_roles")
+        .insert({ user_id, role });
+      if (insErr) throw insErr;
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
