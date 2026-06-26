@@ -1,13 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
-import { createLocalJWKSet, jwtVerify } from "npm:jose@5.9.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const getRequestingUserId = async (authHeader: string) => {
+const getRequestingUserId = async (authHeader: string, supabaseAdmin: ReturnType<typeof createClient>) => {
   if (!authHeader.startsWith("Bearer ")) {
     throw new Error("Token inválido");
   }
@@ -17,23 +16,12 @@ const getRequestingUserId = async (authHeader: string) => {
     throw new Error("Token inválido");
   }
 
-  const jwksRaw = Deno.env.get("SUPABASE_JWKS");
-  if (!jwksRaw) {
-    throw new Error("Configuração de autenticação indisponível");
-  }
-
-  const jwks = createLocalJWKSet(JSON.parse(jwksRaw));
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const { payload } = await jwtVerify(token, jwks, {
-    issuer: `${supabaseUrl}/auth/v1`,
-    audience: "authenticated",
-  });
-
-  if (!payload.sub || typeof payload.sub !== "string") {
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !data.user) {
     throw new Error("Token inválido");
   }
 
-  return payload.sub;
+  return data.user.id;
 };
 
 serve(async (req) => {
