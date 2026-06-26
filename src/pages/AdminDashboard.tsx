@@ -65,7 +65,7 @@ import {
   ExternalLink,
   Trash2,
 } from 'lucide-react';
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, Mail } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import ExternalCommunication from '@/components/admin/ExternalCommunication';
