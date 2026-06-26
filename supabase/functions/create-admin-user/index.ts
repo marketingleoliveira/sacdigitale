@@ -9,6 +9,7 @@ const corsHeaders = {
 interface CreateAdminRequest {
   email: string;
   password: string;
+  role?: string;
 }
 
 serve(async (req) => {
@@ -57,7 +58,9 @@ serve(async (req) => {
       );
     }
 
-    const { email, password }: CreateAdminRequest = await req.json();
+    const { email, password, role: requestedRole }: CreateAdminRequest = await req.json();
+    const allowedRoles = ["desenvolvedor", "qualidade", "gerencia"];
+    const newRole = allowedRoles.includes(requestedRole ?? "") ? requestedRole! : "desenvolvedor";
 
     if (!email || !password) {
       return new Response(
@@ -97,7 +100,7 @@ serve(async (req) => {
     // Add admin role
     const { error: roleInsertError } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: newUser.user.id, role: "admin" });
+      .insert({ user_id: newUser.user.id, role: newRole });
 
     if (roleInsertError) {
       // Rollback: delete the created user
