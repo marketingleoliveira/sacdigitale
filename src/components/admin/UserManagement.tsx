@@ -31,18 +31,40 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, UserPlus, Trash2, Users, Shield } from 'lucide-react';
-import { KeyRound } from 'lucide-react';
+import { Loader2, UserPlus, Trash2, Users, Shield, KeyRound, Briefcase } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+
+type StaffRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia';
 
 interface AdminUser {
   id: string;
   user_id: string;
-  role: 'admin' | 'user';
+  role: StaffRole | 'user';
   created_at: string;
   email?: string | null;
 }
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Desenvolvedor',
+  desenvolvedor: 'Desenvolvedor',
+  qualidade: 'Qualidade',
+  gerencia: 'Gerência',
+};
+
+const ROLE_STYLES: Record<string, string> = {
+  admin: 'bg-purple-100 text-purple-700 border-purple-200',
+  desenvolvedor: 'bg-purple-100 text-purple-700 border-purple-200',
+  qualidade: 'bg-blue-100 text-blue-700 border-blue-200',
+  gerencia: 'bg-amber-100 text-amber-700 border-amber-200',
+};
 
 const emailSchema = z.string().email('E-mail inválido').max(255, 'E-mail muito longo');
 
@@ -70,11 +92,13 @@ export default function UserManagement() {
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState<StaffRole>('qualidade');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
   const [editPassword, setEditPassword] = useState('');
+  const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -99,8 +123,10 @@ export default function UserManagement() {
       );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao listar');
-      const admins = (result.users as AdminUser[]).filter((u) => u.role === 'admin');
-      setAdminUsers(admins);
+      const staff = (result.users as AdminUser[]).filter((u) =>
+        ['admin', 'desenvolvedor', 'qualidade', 'gerencia'].includes(u.role)
+      );
+      setAdminUsers(staff);
     } catch (error) {
       console.error('Error fetching admin users:', error);
       toast({
@@ -144,7 +170,7 @@ export default function UserManagement() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({ email: newEmail, password: newPassword }),
+          body: JSON.stringify({ email: newEmail, password: newPassword, role: newRole }),
         }
       );
 
@@ -161,6 +187,7 @@ export default function UserManagement() {
 
       setNewEmail('');
       setNewPassword('');
+      setNewRole('qualidade');
       setIsAddDialogOpen(false);
       fetchAdminUsers();
     } catch (error) {
