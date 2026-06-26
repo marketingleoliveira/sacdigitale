@@ -661,13 +661,40 @@ export default function AdminDashboard() {
                                 {formatDate(request.created_at)}
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setSelectedRequest(request)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setSelectedRequest(request)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Excluir solicitação?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta ação não pode ser desfeita. A solicitação <strong>{request.protocol}</strong> e todos os tickets internos e e-mails relacionados serão removidos permanentemente.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteRequest(request.id)}
+                                          disabled={isDeleting}
+                                          className="bg-destructive hover:bg-destructive/90"
+                                        >
+                                          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir'}
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
