@@ -1,0 +1,1 @@
+ALTER TABLE public.email_communications ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;

@@ -56,7 +56,7 @@ serve(async (req) => {
       });
     }
 
-    const { sac_request_id, to, subject, body } = await req.json();
+    const { sac_request_id, to, subject, body, attachments } = await req.json();
     if (!sac_request_id || !to || !subject || !body) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios ausentes" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -93,6 +93,28 @@ serve(async (req) => {
     };
     if (useBcc) payload.bcc = [bccEmail];
 
+    // Process attachments: download from signed URL → base64 → Resend attachment
+    const attachmentMeta: { filename: string; url: string; size?: number; content_type?: string }[] = [];
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      const resendAttachments: { filename: string; content: string }[] = [];
+      for (const a of attachments) {
+        try {
+          const r = await fetch(a.url);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const buf = new Uint8Array(await r.arrayBuffer());
+          // base64 encode
+          let bin = "";
+          for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+          const b64 = btoa(bin);
+          resendAttachments.push({ filename: a.filename, content: b64 });
+          attachmentMeta.push({ filename: a.filename, url: a.url, size: a.size, content_type: a.content_type });
+        } catch (e) {
+          console.error(`[send-customer-email] falha ao anexar ${a.filename}:`, e);
+        }
+      }
+      if (resendAttachments.length > 0) payload.attachments = resendAttachments;
+    }
+
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -109,6 +131,7 @@ serve(async (req) => {
         bcc_email: useBcc ? bccEmail : null,
         subject: finalSubject, body, sent_by: user.id, sent_by_email: user.email,
         status: "failed", error_message: JSON.stringify(resendData),
+        attachments: attachmentMeta,
       });
       return new Response(JSON.stringify({ error: "Falha no envio", details: resendData }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -127,6 +150,7 @@ serve(async (req) => {
       bcc_email: useBcc ? bccEmail : null,
       subject: finalSubject, body, resend_id: resendData.id, sent_by: user.id,
       sent_by_email: user.email, status: "sent",
+      attachments: attachmentMeta,
     });
 
     return new Response(JSON.stringify({ success: true, id: resendData.id }), {
