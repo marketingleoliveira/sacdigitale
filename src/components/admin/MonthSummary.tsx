@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Loader2,
   AlertTriangle,
@@ -17,39 +18,141 @@ import {
   Crown,
   Briefcase,
   ShieldCheck,
+  Users,
+  Mail,
+  User,
+  Circle,
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
+
+type StaffRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia';
+
+interface StaffUser {
+  id: string;
+  user_id: string;
+  role: StaffRole;
+  created_at: string;
+  email: string | null;
+}
+
 
 const monthNames = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
+const ROLE_CONFIG: Record<StaffRole, { label: string; description: string; icon: React.ReactNode; badge: string; gradient: string; rank: number }> = {
+  admin: {
+    label: 'Desenvolvimento',
+    description: 'Equipe de desenvolvimento e suporte técnico',
+    icon: <Crown className="h-4 w-4" />,
+    badge: 'Desenvolvedor',
+    gradient: 'bg-gradient-to-r from-primary/20 to-primary/5 border-primary/30',
+    rank: 1,
+  },
+  desenvolvedor: {
+    label: 'Desenvolvimento',
+    description: 'Equipe de desenvolvimento e suporte técnico',
+    icon: <Crown className="h-4 w-4" />,
+    badge: 'Desenvolvedor',
+    gradient: 'bg-gradient-to-r from-primary/20 to-primary/5 border-primary/30',
+    rank: 1,
+  },
+  gerencia: {
+    label: 'Gerência',
+    description: 'Gestão de usuários e supervisão geral',
+    icon: <Briefcase className="h-4 w-4" />,
+    badge: 'Gerência',
+    gradient: 'bg-gradient-to-r from-amber-500/10 to-amber-500/5 border-amber-500/30',
+    rank: 2,
+  },
+  qualidade: {
+    label: 'Qualidade',
+    description: 'Operação de atendimento e qualidade',
+    icon: <ShieldCheck className="h-4 w-4" />,
+    badge: 'Qualidade',
+    gradient: 'bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border-emerald-500/30',
+    rank: 3,
+  },
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Desenvolvedor',
+  desenvolvedor: 'Desenvolvedor',
+  qualidade: 'Qualidade',
+  gerencia: 'Gerência',
+};
+
+const ROLE_BADGE_STYLES: Record<string, string> = {
+  admin: 'bg-purple-100 text-purple-700 border-purple-200',
+  desenvolvedor: 'bg-purple-100 text-purple-700 border-purple-200',
+  qualidade: 'bg-blue-100 text-blue-700 border-blue-200',
+  gerencia: 'bg-amber-100 text-amber-700 border-amber-200',
+};
+
+const getFreshAccessToken = async () => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const expiresAt = sessionData.session?.expires_at ?? 0;
+  const shouldRefresh = expiresAt * 1000 < Date.now() + 60_000;
+
+  if (!sessionData.session || shouldRefresh) {
+    const { data: refreshedData, error } = await supabase.auth.refreshSession();
+    if (error || !refreshedData.session?.access_token) {
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    return refreshedData.session.access_token;
+  }
+
+  return sessionData.session.access_token;
+};
+
 export default function MonthSummary() {
   const [requests, setRequests] = useState<SACRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [roleCounts, setRoleCounts] = useState<{ desenvolvedor: number; gerencia: number; qualidade: number }>({
-    desenvolvedor: 0,
-    gerencia: 0,
-    qualidade: 0,
-  });
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
   useEffect(() => {
     (async () => {
       setIsLoading(true);
-      const [{ data: reqs }, { data: roles }] = await Promise.all([
-        supabase.from('sac_requests').select('*').order('created_at', { ascending: false }),
-        supabase.from('user_roles').select('role'),
-      ]);
+      const { data: reqs } = await supabase
+        .from('sac_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
       setRequests(reqs || []);
-      const counts = { desenvolvedor: 0, gerencia: 0, qualidade: 0 };
-      (roles || []).forEach((r: any) => {
-        if (r.role in counts) counts[r.role as keyof typeof counts]++;
-      });
-      setRoleCounts(counts);
       setIsLoading(false);
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setIsLoadingUsers(true);
+      try {
+        const token = await getFreshAccessToken();
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action: 'list' }),
+          }
+        );
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Erro ao listar');
+        const staff = (result.users as StaffUser[]).filter((u) =>
+          ['desenvolvedor', 'qualidade', 'gerencia'].includes(u.role)
+        );
+        setStaffUsers(staff);
+      } catch (error) {
+        console.error('Error fetching staff users:', error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
     })();
   }, []);
 
@@ -90,6 +193,19 @@ export default function MonthSummary() {
       hoje,
     };
   }, [requests]);
+
+  const usersByRole = useMemo(() => {
+    const groups: Record<StaffRole, StaffUser[]> = {
+      admin: [],
+      desenvolvedor: [],
+      qualidade: [],
+      gerencia: [],
+    };
+    staffUsers.forEach((u) => {
+      if (u.role in groups) groups[u.role].push(u);
+    });
+    return groups;
+  }, [staffUsers]);
 
   if (isLoading) {
     return (
@@ -197,78 +313,91 @@ export default function MonthSummary() {
         </CardContent>
       </Card>
 
-      {/* Hierarquia de cargos */}
+      {/* Contas no sistema */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Hierarquia de cargos</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Contas no sistema
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center gap-4">
-            <HierarchyNode
-              rank={1}
-              title="Desenvolvedor"
-              count={roleCounts.desenvolvedor}
-              icon={<Crown className="h-5 w-5" />}
-              gradient="from-amber-500 to-amber-700"
-              description="Super admin — acesso total"
-            />
-            <div className="w-px h-6 bg-border" />
-            <HierarchyNode
-              rank={2}
-              title="Gerência"
-              count={roleCounts.gerencia}
-              icon={<Briefcase className="h-5 w-5" />}
-              gradient="from-blue-500 to-blue-700"
-              description="Acesso completo + gestão de usuários"
-            />
-            <div className="w-px h-6 bg-border" />
-            <HierarchyNode
-              rank={3}
-              title="Qualidade"
-              count={roleCounts.qualidade}
-              icon={<ShieldCheck className="h-5 w-5" />}
-              gradient="from-emerald-500 to-emerald-700"
-              description="Operação sem exclusões"
-            />
-          </div>
+        <CardContent className="space-y-6">
+          {isLoadingUsers ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : staffUsers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Nenhuma conta cadastrada.</p>
+          ) : (
+            <>
+              <RoleSection role="desenvolvedor" users={[...usersByRole.admin, ...usersByRole.desenvolvedor]} />
+              <RoleSection role="gerencia" users={usersByRole.gerencia} />
+              <RoleSection role="qualidade" users={usersByRole.qualidade} />
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function HierarchyNode({
-  rank,
-  title,
-  count,
-  icon,
-  gradient,
-  description,
-}: {
-  rank: number;
-  title: string;
-  count: number;
-  icon: React.ReactNode;
-  gradient: string;
-  description: string;
-}) {
+function RoleSection({ role, users }: { role: StaffRole; users: StaffUser[] }) {
+  const config = ROLE_CONFIG[role];
   return (
-    <div className={`w-full max-w-md rounded-lg border bg-gradient-to-r ${gradient} text-white p-4 shadow-sm`}>
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center font-bold">
-          {rank}
+    <div className={`rounded-xl border p-5 ${config.gradient}`}>
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-primary">{config.icon}</span>
+        <h3 className="font-semibold text-foreground">{config.label}</h3>
+        <Badge variant="outline" className="text-xs ml-2">
+          {users.length}
+        </Badge>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">{config.description}</p>
+      {users.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum usuário neste cargo.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {users.map((user) => (
+            <UserCard key={user.id} user={user} />
+          ))}
         </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 font-semibold">
-            {icon}
-            {title}
-          </div>
-          <p className="text-xs text-white/80">{description}</p>
+      )}
+    </div>
+  );
+}
+
+function UserCard({ user }: { user: StaffUser }) {
+  const email = user.email || '';
+  const name = email.split('@')[0] || 'Usuário';
+  const initials = name
+    .split(/[._-]/)
+    .map((part) => part[0]?.toUpperCase())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('');
+
+  return (
+    <div className="rounded-lg border bg-card p-4 flex flex-col items-center text-center gap-3 shadow-sm">
+      <Avatar className="h-14 w-14 border-2 border-background">
+        <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+          {initials || <User className="h-5 w-5" />}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 w-full">
+        <p className="font-medium text-sm truncate" title={name}>{name}</p>
+        <p className="text-xs text-muted-foreground truncate" title={email}>{email}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className={`text-xs ${ROLE_BADGE_STYLES[user.role] || ''}`}>
+          {ROLE_LABELS[user.role] || user.role}
+        </Badge>
+        <div className="flex items-center gap-1 text-muted-foreground" title="Ativo">
+          <Circle className="h-2 w-2 fill-emerald-500 text-emerald-500" />
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold leading-none">{count}</p>
-          <p className="text-[10px] text-white/80 uppercase tracking-wide">{count === 1 ? 'usuário' : 'usuários'}</p>
-        </div>
+      </div>
+      <div className="flex items-center gap-3 text-muted-foreground">
+        <Mail className="h-4 w-4" />
+        <User className="h-4 w-4" />
       </div>
     </div>
   );
