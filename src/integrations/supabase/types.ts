@@ -40,6 +40,7 @@ export type Database = {
       }
       email_communications: {
         Row: {
+          attachments: Json | null
           bcc_email: string | null
           body: string
           created_at: string
@@ -57,6 +58,7 @@ export type Database = {
           to_email: string
         }
         Insert: {
+          attachments?: Json | null
           bcc_email?: string | null
           body: string
           created_at?: string
@@ -74,6 +76,7 @@ export type Database = {
           to_email: string
         }
         Update: {
+          attachments?: Json | null
           bcc_email?: string | null
           body?: string
           created_at?: string
