@@ -33,6 +33,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Loader2,
   LogOut,
   Search,
@@ -52,6 +63,7 @@ import {
   Image,
   Video,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { LayoutDashboard } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
@@ -97,6 +109,7 @@ export default function AdminDashboard() {
   const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
   const [invoiceDraft, setInvoiceDraft] = useState<string>('');
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setInvoiceDraft(selectedRequest?.order_number || '');
@@ -316,6 +329,22 @@ export default function AdminDashboard() {
 
     if (selectedRequest?.id === requestId) {
       setSelectedRequest((prev) => prev ? { ...prev, laudos } : null);
+    }
+  };
+
+  const deleteRequest = async (requestId: string) => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('sac_requests').delete().eq('id', requestId);
+      if (error) throw error;
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      if (selectedRequest?.id === requestId) setSelectedRequest(null);
+      toast.success('Solicitação excluída');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao excluir solicitação');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -632,13 +661,40 @@ export default function AdminDashboard() {
                                 {formatDate(request.created_at)}
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setSelectedRequest(request)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setSelectedRequest(request)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Excluir solicitação?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta ação não pode ser desfeita. A solicitação <strong>{request.protocol}</strong> e todos os tickets internos e e-mails relacionados serão removidos permanentemente.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteRequest(request.id)}
+                                          disabled={isDeleting}
+                                          className="bg-destructive hover:bg-destructive/90"
+                                        >
+                                          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir'}
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
