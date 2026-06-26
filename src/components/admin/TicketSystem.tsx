@@ -7,6 +7,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, MessageSquare, User } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 interface Ticket {
@@ -32,6 +44,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
   const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const getEmailPrefix = (email: string | null): string => {
     if (!email) return 'Admin';
@@ -88,6 +101,21 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
     }
   };
 
+  const handleDelete = async (ticketId: string) => {
+    setDeletingId(ticketId);
+    try {
+      const { error } = await supabase.from('tickets').delete().eq('id', ticketId);
+      if (error) throw error;
+      setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+      toast.success('Mensagem excluída');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao excluir mensagem');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('pt-BR', {
       day: '2-digit',
@@ -139,6 +167,39 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
                         <span className="text-xs text-muted-foreground">
                           {formatDate(ticket.created_at)}
                         </span>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 ml-auto text-muted-foreground hover:text-destructive"
+                              disabled={deletingId === ticket.id}
+                            >
+                              {deletingId === ticket.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(ticket.id)}
+                                className="bg-destructive hover:bg-destructive/90"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{ticket.message}</p>
                     </div>
