@@ -33,6 +33,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Loader2,
   LogOut,
   Search,
@@ -52,6 +63,7 @@ import {
   Image,
   Video,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { LayoutDashboard } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
@@ -97,6 +109,7 @@ export default function AdminDashboard() {
   const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
   const [invoiceDraft, setInvoiceDraft] = useState<string>('');
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setInvoiceDraft(selectedRequest?.order_number || '');
@@ -316,6 +329,22 @@ export default function AdminDashboard() {
 
     if (selectedRequest?.id === requestId) {
       setSelectedRequest((prev) => prev ? { ...prev, laudos } : null);
+    }
+  };
+
+  const deleteRequest = async (requestId: string) => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('sac_requests').delete().eq('id', requestId);
+      if (error) throw error;
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      if (selectedRequest?.id === requestId) setSelectedRequest(null);
+      toast.success('Solicitação excluída');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao excluir solicitação');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
