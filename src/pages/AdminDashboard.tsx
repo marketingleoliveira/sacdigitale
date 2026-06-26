@@ -429,6 +429,12 @@ export default function AdminDashboard() {
               <AlertTriangle className="h-4 w-4" />
               Tipos de Reclamação
             </TabsTrigger>
+            {canManageUsers && (
+              <TabsTrigger value="external-settings" className="gap-2">
+                <Mail className="h-4 w-4" />
+                Configurações Externas
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="summary">
@@ -725,6 +731,12 @@ export default function AdminDashboard() {
           <TabsContent value="complaint-types">
             <ComplaintTypesManagement />
           </TabsContent>
+
+          {canManageUsers && (
+            <TabsContent value="external-settings">
+              <ExternalSettings />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 
