@@ -46,7 +46,7 @@ serve(async (req) => {
 
     let requestingUserId: string;
     try {
-      requestingUserId = await getRequestingUserId(authHeader);
+      requestingUserId = await getRequestingUserId(authHeader, supabaseAdmin);
     } catch (authError) {
       console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Token inválido" }), {
