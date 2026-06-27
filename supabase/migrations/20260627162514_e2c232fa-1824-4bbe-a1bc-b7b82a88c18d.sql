@@ -1,0 +1,2 @@
+ALTER TABLE public.email_communications ADD COLUMN IF NOT EXISTS read_at timestamptz;
+CREATE INDEX IF NOT EXISTS idx_email_communications_unread_inbound ON public.email_communications (sac_request_id) WHERE direction = 'inbound' AND read_at IS NULL;
