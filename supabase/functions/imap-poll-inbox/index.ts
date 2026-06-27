@@ -1,5 +1,3 @@
-import { ImapFlow } from "npm:imapflow@1.0.164";
-import { simpleParser } from "npm:mailparser@3.7.1";
 import { createClient } from "npm:@supabase/supabase-js@2.49.2";
 
 const corsHeaders = {
@@ -7,18 +5,163 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
-// Polls the Locaweb IMAP inbox for qualidade@digitaletextil.com.br and links
-// replies to SAC requests by matching the [SACyyyymmdd-XXXX] protocol token in
-// the subject line. Unmatched messages are still stored (sac_request_id=null)
-// so they can be reviewed manually later.
+// Minimal raw IMAP client (Dovecot-compatible) — keeps CPU usage low so we
+// stay within Supabase Edge Function limits. Supports UID SEARCH/FETCH/STORE
+// and parses just enough headers + text body to link replies to SAC tickets.
+class ImapClient {
+  private conn!: Deno.TlsConn;
+  private decoder = new TextDecoder();
+  private encoder = new TextEncoder();
+  private buffer = "";
+  private tag = 0;
+
+  async connect(host: string, port: number) {
+    this.conn = await Deno.connectTls({ hostname: host, port });
+    await this.readUntil(/\r\n/); // greeting
+  }
+  private async readChunk(): Promise<void> {
+    const buf = new Uint8Array(64 * 1024);
+    const n = await this.conn.read(buf);
+    if (n === null) throw new Error("Conexão IMAP encerrada");
+    this.buffer += this.decoder.decode(buf.subarray(0, n));
+  }
+  private async readUntil(re: RegExp): Promise<string> {
+    while (!re.test(this.buffer)) await this.readChunk();
+    const m = this.buffer.match(re)!;
+    const idx = (m.index ?? 0) + m[0].length;
+    const out = this.buffer.slice(0, idx);
+    this.buffer = this.buffer.slice(idx);
+    return out;
+  }
+  private async write(s: string) {
+    await this.conn.write(this.encoder.encode(s));
+  }
+  // Reads response until we see "<tag> OK|NO|BAD". Handles literals {N}.
+  private async readResponse(tag: string): Promise<string> {
+    let out = "";
+    const endRe = new RegExp(`^${tag} (OK|NO|BAD)[^\r\n]*\r\n`, "m");
+    while (true) {
+      // pull more data
+      if (!/\r\n/.test(this.buffer)) await this.readChunk();
+      // handle literal {N} in the current buffered content
+      const litMatch = this.buffer.match(/\{(\d+)\}\r\n/);
+      if (litMatch) {
+        const litStart = (litMatch.index ?? 0) + litMatch[0].length;
+        const litLen = parseInt(litMatch[1], 10);
+        while (this.buffer.length < litStart + litLen) await this.readChunk();
+        // keep accumulating
+      }
+      const m = this.buffer.match(endRe);
+      if (m) {
+        const end = (m.index ?? 0) + m[0].length;
+        out += this.buffer.slice(0, end);
+        this.buffer = this.buffer.slice(end);
+        return out;
+      }
+      // not yet done — pull more
+      if (!this.buffer.includes("\r\n")) await this.readChunk();
+      else {
+        // drain known lines that aren't the tag terminator yet
+        const newlineIdx = this.buffer.lastIndexOf("\r\n");
+        out += this.buffer.slice(0, newlineIdx + 2);
+        this.buffer = this.buffer.slice(newlineIdx + 2);
+        await this.readChunk();
+      }
+    }
+  }
+  async cmd(command: string): Promise<string> {
+    this.tag++;
+    const tag = `A${this.tag.toString().padStart(4, "0")}`;
+    await this.write(`${tag} ${command}\r\n`);
+    const resp = await this.readResponse(tag);
+    if (!new RegExp(`^${tag} OK`, "m").test(resp)) {
+      throw new Error(`IMAP cmd failed: ${command.split(" ")[0]} → ${resp.split("\r\n").pop()}`);
+    }
+    return resp;
+  }
+  async login(user: string, pass: string) {
+    const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    await this.cmd(`LOGIN "${esc(user)}" "${esc(pass)}"`);
+  }
+  async select(mailbox = "INBOX") { await this.cmd(`SELECT ${mailbox}`); }
+  async searchUnseenUids(): Promise<number[]> {
+    const r = await this.cmd("UID SEARCH UNSEEN");
+    const line = r.split("\r\n").find((l) => l.startsWith("* SEARCH")) ?? "";
+    return line.replace("* SEARCH", "").trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => !isNaN(n));
+  }
+  async fetchMessage(uid: number): Promise<{ headers: Record<string, string>; body: string }> {
+    const resp = await this.cmd(
+      `UID FETCH ${uid} (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO MESSAGE-ID DATE)] BODY.PEEK[TEXT]<0.30000>)`
+    );
+    // Extract literals: each BODY[...] section is followed by {N}\r\n<data>
+    const literals: string[] = [];
+    let i = 0;
+    while (true) {
+      const m = resp.slice(i).match(/\{(\d+)\}\r\n/);
+      if (!m) break;
+      const start = i + (m.index ?? 0) + m[0].length;
+      const len = parseInt(m[1], 10);
+      literals.push(resp.slice(start, start + len));
+      i = start + len;
+    }
+    const headerText = literals[0] ?? "";
+    const bodyText = literals[1] ?? "";
+    const headers: Record<string, string> = {};
+    // Unfold continuation lines and split by ': '
+    const unfolded = headerText.replace(/\r\n[ \t]+/g, " ");
+    for (const line of unfolded.split(/\r\n/)) {
+      const idx = line.indexOf(":");
+      if (idx <= 0) continue;
+      headers[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+    }
+    return { headers, body: bodyText };
+  }
+  async markSeen(uid: number) { await this.cmd(`UID STORE ${uid} +FLAGS (\\Seen)`); }
+  async logout() { try { await this.cmd("LOGOUT"); } catch { /* ignore */ } try { this.conn.close(); } catch { /* ignore */ } }
+}
+
+// Decode RFC 2047 MIME encoded-words ("=?utf-8?B?...?=" / "=?utf-8?Q?...?=")
+function decodeMimeHeader(s: string): string {
+  if (!s) return "";
+  return s.replace(/=\?([^?]+)\?([bBqQ])\?([^?]*)\?=/g, (_m, charset, enc, data) => {
+    try {
+      let bytes: Uint8Array;
+      if (enc.toUpperCase() === "B") {
+        const bin = atob(data);
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } else {
+        const decoded = data.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_x: string, h: string) => String.fromCharCode(parseInt(h, 16)));
+        bytes = new Uint8Array(decoded.length);
+        for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
+      }
+      return new TextDecoder(charset || "utf-8").decode(bytes);
+    } catch { return _m; }
+  });
+}
+
+function extractEmail(header: string): string {
+  const m = header.match(/<([^>]+)>/) || header.match(/([^\s<>,]+@[^\s<>,]+)/);
+  return m ? m[1] : header.trim();
+}
+
+// Decode quoted-printable in body
+function decodeQP(s: string): string {
+  return s.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+function stripHtml(s: string): string {
+  return s.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: accept either a valid Supabase JWT (manual sync from admin UI)
-  // or the IMAP_CRON_SECRET header (scheduled pg_cron call).
   const cronSecret = Deno.env.get("IMAP_CRON_SECRET") ?? "";
   const providedCron = req.headers.get("x-cron-secret") ?? "";
-  const isCron = cronSecret && providedCron && providedCron === cronSecret;
+  const isCron = !!(cronSecret && providedCron && providedCron === cronSecret);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -68,98 +211,71 @@ Deno.serve(async (req) => {
     });
   }
 
-  const client = new ImapFlow({
-    host, port, secure: port === 993,
-    auth: { user, pass },
-    logger: false,
-    socketTimeout: 30_000,
-  });
-
+  const imap = new ImapClient();
   let processed = 0, linked = 0, unlinked = 0, skipped = 0, failed = 0;
   const errors: string[] = [];
 
   try {
-    await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
-    try {
-      // Fetch unseen messages (limit batch to 50 per run)
-      const uids = (await client.search({ seen: false }, { uid: true })) || [];
-      const batch = uids.slice(0, 50);
+    await imap.connect(host, port);
+    await imap.login(user, pass);
+    await imap.select("INBOX");
+    const uids = await imap.searchUnseenUids();
+    const batch = uids.slice(0, 25);
 
-      for (const uid of batch) {
-        processed++;
-        try {
-          const msg = await client.fetchOne(String(uid), { source: true, envelope: true, uid: true }, { uid: true });
-          if (!msg || !msg.source) { skipped++; continue; }
+    for (const uid of batch) {
+      processed++;
+      try {
+        const { headers, body } = await imap.fetchMessage(uid);
+        const subject = decodeMimeHeader(headers["subject"] ?? "");
+        const from = extractEmail(decodeMimeHeader(headers["from"] ?? ""));
+        const to = extractEmail(decodeMimeHeader(headers["to"] ?? "")) || user;
+        const messageId = (headers["message-id"] ?? "").replace(/[<>]/g, "").trim() || null;
 
-          const parsed = await simpleParser(msg.source as Uint8Array);
-          const subject = parsed.subject ?? msg.envelope?.subject ?? "";
-          const from = parsed.from?.value?.[0]?.address ?? msg.envelope?.from?.[0]?.address ?? "desconhecido";
-          const to = parsed.to && "value" in parsed.to ? parsed.to.value?.[0]?.address : msg.envelope?.to?.[0]?.address ?? user;
-          const text = (parsed.text || parsed.html || "").toString().slice(0, 50_000);
-          const messageId = parsed.messageId ?? msg.envelope?.messageId ?? null;
-
-          // Idempotency: skip if we've already stored this message-id
-          if (messageId) {
-            const { data: existing } = await admin
-              .from("email_communications")
-              .select("id")
-              .eq("resend_id", messageId)
-              .maybeSingle();
-            if (existing) {
-              await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
-              skipped++;
-              continue;
-            }
-          }
-
-          const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
-          let sacRequestId: string | null = null;
-          if (match) {
-            const protocol = match[0].toUpperCase();
-            const { data: sac } = await admin
-              .from("sac_requests").select("id").eq("protocol", protocol).maybeSingle();
-            sacRequestId = sac?.id ?? null;
-          }
-
-          const { error: insErr } = await admin.from("email_communications").insert({
-            sac_request_id: sacRequestId,
-            direction: "inbound",
-            from_email: from,
-            to_email: to || user,
-            subject,
-            body: text || "(sem conteúdo)",
-            status: sacRequestId ? "received" : "unlinked",
-            resend_id: messageId,
-            raw_payload: {
-              source: "imap-locaweb",
-              uid,
-              messageId,
-              date: parsed.date?.toISOString?.() ?? null,
-              headers: Object.fromEntries(parsed.headerLines?.map?.((h) => [h.key, h.line]) ?? []),
-            },
-          });
-
-          if (insErr) {
-            failed++;
-            errors.push(`uid ${uid}: ${insErr.message}`);
-            continue;
-          }
-
-          if (sacRequestId) linked++; else unlinked++;
-          await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
-        } catch (e) {
-          failed++;
-          errors.push(`uid ${uid}: ${e instanceof Error ? e.message : String(e)}`);
+        // Idempotency
+        if (messageId) {
+          const { data: existing } = await admin
+            .from("email_communications").select("id").eq("resend_id", messageId).maybeSingle();
+          if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
+
+        // Body: try to decode QP; if HTML, strip; truncate
+        let text = body;
+        if (/<[a-z][\s\S]*>/i.test(text)) text = stripHtml(text);
+        text = decodeQP(text).trim().slice(0, 20_000) || "(sem conteúdo)";
+
+        const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
+        let sacRequestId: string | null = null;
+        if (match) {
+          const protocol = match[0].toUpperCase();
+          const { data: sac } = await admin
+            .from("sac_requests").select("id").eq("protocol", protocol).maybeSingle();
+          sacRequestId = sac?.id ?? null;
+        }
+
+        const { error: insErr } = await admin.from("email_communications").insert({
+          sac_request_id: sacRequestId,
+          direction: "inbound",
+          from_email: from || "desconhecido",
+          to_email: to,
+          subject,
+          body: text,
+          status: sacRequestId ? "received" : "unlinked",
+          resend_id: messageId,
+          raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null },
+        });
+        if (insErr) { failed++; errors.push(`uid ${uid}: ${insErr.message}`); continue; }
+
+        if (sacRequestId) linked++; else unlinked++;
+        await imap.markSeen(uid);
+      } catch (e) {
+        failed++;
+        errors.push(`uid ${uid}: ${e instanceof Error ? e.message : String(e)}`);
       }
-    } finally {
-      lock.release();
     }
-    await client.logout();
+    await imap.logout();
   } catch (e) {
     console.error("imap-poll-inbox error:", e);
-    try { await client.close(); } catch { /* ignore */ }
+    try { await imap.logout(); } catch { /* ignore */ }
     return new Response(JSON.stringify({
       error: "Falha IMAP", details: e instanceof Error ? e.message : String(e),
       processed, linked, unlinked, failed,

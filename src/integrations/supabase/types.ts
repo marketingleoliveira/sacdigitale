@@ -50,7 +50,7 @@ export type Database = {
           id: string
           raw_payload: Json | null
           resend_id: string | null
-          sac_request_id: string
+          sac_request_id: string | null
           sent_by: string | null
           sent_by_email: string | null
           status: string
@@ -68,7 +68,7 @@ export type Database = {
           id?: string
           raw_payload?: Json | null
           resend_id?: string | null
-          sac_request_id: string
+          sac_request_id?: string | null
           sent_by?: string | null
           sent_by_email?: string | null
           status?: string
@@ -86,7 +86,7 @@ export type Database = {
           id?: string
           raw_payload?: Json | null
           resend_id?: string | null
-          sac_request_id?: string
+          sac_request_id?: string | null
           sent_by?: string | null
           sent_by_email?: string | null
           status?: string

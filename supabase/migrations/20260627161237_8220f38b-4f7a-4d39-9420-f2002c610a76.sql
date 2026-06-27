@@ -1,0 +1,1 @@
+ALTER TABLE public.email_communications ALTER COLUMN sac_request_id DROP NOT NULL;
