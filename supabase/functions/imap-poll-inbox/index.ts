@@ -334,10 +334,20 @@ Deno.serve(async (req) => {
           if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
 
-        // Body: try to decode QP; if HTML, strip; truncate
-        let text = body;
-        if (/<[a-z][\s\S]*>/i.test(text)) text = stripHtml(text);
-        text = decodeQP(text).trim().slice(0, 20_000) || "(sem conteúdo)";
+        // Decode MIME body: walk parts, prefer text/plain, fall back to HTML.
+        const ct = headers["content-type"] ?? "text/plain; charset=utf-8";
+        const cte = headers["content-transfer-encoding"] ?? "";
+        let text: string;
+        const { type: topType, params: topParams } = parseContentType(ct);
+        if (topType.startsWith("multipart/")) {
+          text = extractTextFromMime(body, ct);
+        } else if (topType === "text/html") {
+          text = stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
+        } else {
+          text = decodePart(body, cte, topParams.charset ?? "utf-8");
+        }
+        // Remove quoted previous-message blocks (Em ... escreveu:, >, From:, etc.)
+        text = stripQuotedReply(text).slice(0, 20_000) || "(sem conteúdo)";
 
         const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
         let sacRequestId: string | null = null;
