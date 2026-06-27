@@ -111,6 +111,7 @@ export default function AdminDashboard() {
   const [invoiceDraft, setInvoiceDraft] = useState<string>('');
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setInvoiceDraft(selectedRequest?.order_number || '');
@@ -170,6 +171,7 @@ export default function AdminDashboard() {
     if (user && isAdmin) {
       fetchRequests();
       fetchComplaintTypes();
+      fetchUnreadReplies();
     }
   }, [user, isAdmin]);
 
@@ -225,6 +227,53 @@ export default function AdminDashboard() {
       console.error('Error fetching requests:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchUnreadReplies = async () => {
+    const { data, error } = await supabase
+      .from('email_communications')
+      .select('sac_request_id')
+      .eq('direction', 'inbound')
+      .is('read_at', null)
+      .not('sac_request_id', 'is', null);
+    if (error) { console.error(error); return; }
+    const map: Record<string, number> = {};
+    for (const row of (data ?? []) as { sac_request_id: string | null }[]) {
+      if (!row.sac_request_id) continue;
+      map[row.sac_request_id] = (map[row.sac_request_id] ?? 0) + 1;
+    }
+    setUnreadByRequest(map);
+  };
+
+  // Realtime: re-fetch when new inbound arrives
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+    const channel = supabase
+      .channel('inbound-replies')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'email_communications' },
+        () => fetchUnreadReplies())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, isAdmin]);
+
+  const openRequest = async (request: SACRequest) => {
+    setSelectedRequest(request);
+    if (unreadByRequest[request.id]) {
+      const { error } = await supabase
+        .from('email_communications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('sac_request_id', request.id)
+        .eq('direction', 'inbound')
+        .is('read_at', null);
+      if (!error) {
+        setUnreadByRequest((prev) => {
+          const next = { ...prev };
+          delete next[request.id];
+          return next;
+        });
+      }
     }
   };
 
@@ -623,7 +672,14 @@ export default function AdminDashboard() {
                           return (
                             <TableRow key={request.id}>
                               <TableCell className="font-mono text-sm">
-                                {request.protocol}
+                                <div className="flex flex-col gap-1">
+                                  {unreadByRequest[request.id] ? (
+                                    <Badge className="w-fit bg-emerald-600 hover:bg-emerald-600 text-white animate-pulse">
+                                      RESPONDIDO
+                                    </Badge>
+                                  ) : null}
+                                  <span>{request.protocol}</span>
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-col gap-1">
@@ -674,7 +730,7 @@ export default function AdminDashboard() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => setSelectedRequest(request)}
+                                    onClick={() => openRequest(request)}
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>

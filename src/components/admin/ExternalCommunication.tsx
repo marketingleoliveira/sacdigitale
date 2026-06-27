@@ -170,7 +170,9 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
                     <strong>De:</strong> {e.from_email} • <strong>Para:</strong> {e.to_email}
                     {e.sent_by_email && <> • <strong>Por:</strong> {e.sent_by_email.split('@')[0]}</>}
                   </div>
-                  {e.subject && <div className="text-sm font-medium">{e.subject}</div>}
+                  {e.subject && e.direction === 'outbound' && (
+                    <div className="text-sm font-medium">{e.subject}</div>
+                  )}
                   <p className="text-sm whitespace-pre-wrap">{e.body}</p>
                   {e.attachments && e.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2 pt-1">
