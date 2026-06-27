@@ -210,19 +210,23 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
       const partHeaders = parseHeaders(trimmed.slice(0, sep));
       const partBody = trimmed.slice(sep + 4).replace(/\r?\n--?$/, "");
       const partCT = partHeaders["content-type"] ?? "text/plain";
-      const sub = extractTextFromMime(partBody, partCT);
-      const { type: subType } = parseContentType(partCT);
-      if (subType === "text/plain" && sub.trim()) return sub;
-      if (subType === "text/html" && !htmlFallback) htmlFallback = stripHtml(sub);
-      if (subType.startsWith("multipart/") && sub.trim()) return sub;
+      const partEnc = partHeaders["content-transfer-encoding"] ?? "";
+      const { type: subType, params: subParams } = parseContentType(partCT);
+      if (subType.startsWith("multipart/")) {
+        const sub = extractTextFromMime(partBody, partCT);
+        if (sub.trim()) return sub;
+        continue;
+      }
+      if (subType === "text/plain") {
+        const dec = decodePart(partBody, partEnc, subParams.charset ?? "utf-8");
+        if (dec.trim()) return dec;
+      } else if (subType === "text/html" && !htmlFallback) {
+        const dec = decodePart(partBody, partEnc, subParams.charset ?? "utf-8");
+        htmlFallback = stripHtml(dec);
+      }
     }
     return htmlFallback;
   }
-  // leaf part — assume rawBody already has headers stripped by caller? In our
-  // walker we pass only the body portion, so just decode.
-  // (Top-level non-multipart messages also pass through here — rawBody is the
-  // body portion. We need encoding/charset from the outer headers; the caller
-  // supplies them by wrapping. For safety, default to identity here.)
   return rawBody;
 }
 
