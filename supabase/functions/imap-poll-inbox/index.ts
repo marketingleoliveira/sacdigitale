@@ -232,22 +232,29 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
 
 // Remove quoted reply / signature blocks so we keep only the new message.
 function stripQuotedReply(text: string): string {
+  // Allow the attribution line to wrap across lines (e.g. "Em sáb. ...\n
+  // <email> escreveu:") by using [\s\S] between the keyword and the verb.
   const markers: RegExp[] = [
-    /^\s*Em\s.+escreveu\s*:?\s*$/im,                  // pt-BR Gmail
-    /^\s*On\s.+wrote\s*:?\s*$/im,                     // en Gmail
-    /^\s*Le\s.+a écrit\s*:?\s*$/im,                   // fr
-    /^\s*-{2,}\s*Mensagem (original|encaminhada)\s*-{2,}\s*$/im,
-    /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
-    /^\s*_{5,}\s*$/m,                                 // Outlook divider
-    /^\s*De\s*:\s.+$/im,                              // pt header block
-    /^\s*From\s*:\s.+$/im,                            // en header block
-    /^>.*$/m,                                         // first quoted line
-    /^\s*Protocolo\s+SAC\d{8}-[A-Z0-9]+/im,           // our own footer
+    /(^|\n)\s*Em\s[\s\S]{0,400}?escreveu\s*:?/i,                 // pt-BR Gmail
+    /(^|\n)\s*On\s[\s\S]{0,400}?wrote\s*:?/i,                    // en Gmail
+    /(^|\n)\s*Le\s[\s\S]{0,400}?a écrit\s*:?/i,                  // fr
+    /(^|\n)\s*-{2,}\s*Mensagem (original|encaminhada)\s*-{2,}/i,
+    /(^|\n)\s*-{2,}\s*Original Message\s*-{2,}/i,
+    /(^|\n)\s*_{5,}\s*(\n|$)/,                                   // Outlook divider
+    /(^|\n)\s*De\s*:\s.+/i,                                      // pt header block
+    /(^|\n)\s*From\s*:\s.+/i,                                    // en header block
+    /(^|\n)>.*/,                                                 // first quoted line
+    /(^|\n)\s*Protocolo\s+SAC\d{8}-[A-Z0-9]+/i,                  // our own footer
   ];
   let cut = text.length;
   for (const re of markers) {
     const m = text.match(re);
-    if (m && (m.index ?? -1) >= 0 && m.index! < cut) cut = m.index!;
+    if (m && (m.index ?? -1) >= 0) {
+      // m.index points at the leading newline; advance past it so we keep
+      // the preceding content intact.
+      const start = m.index! + (m[1] === "\n" ? 1 : 0);
+      if (start < cut) cut = start;
+    }
   }
   return text.slice(0, cut).replace(/[\s\n]+$/, "").trim();
 }
