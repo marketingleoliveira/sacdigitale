@@ -90,31 +90,19 @@ class ImapClient {
     return line.replace("* SEARCH", "").trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => !isNaN(n));
   }
   async fetchMessage(uid: number): Promise<{ headers: Record<string, string>; body: string }> {
-    const resp = await this.cmd(
-      `UID FETCH ${uid} (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO MESSAGE-ID DATE)] BODY.PEEK[TEXT]<0.30000>)`
-    );
-    // Extract literals: each BODY[...] section is followed by {N}\r\n<data>
-    const literals: string[] = [];
-    let i = 0;
-    while (true) {
-      const m = resp.slice(i).match(/\{(\d+)\}\r\n/);
-      if (!m) break;
-      const start = i + (m.index ?? 0) + m[0].length;
-      const len = parseInt(m[1], 10);
-      literals.push(resp.slice(start, start + len));
-      i = start + len;
-    }
-    const headerText = literals[0] ?? "";
-    const bodyText = literals[1] ?? "";
-    const headers: Record<string, string> = {};
-    // Unfold continuation lines and split by ': '
-    const unfolded = headerText.replace(/\r\n[ \t]+/g, " ");
-    for (const line of unfolded.split(/\r\n/)) {
-      const idx = line.indexOf(":");
-      if (idx <= 0) continue;
-      headers[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
-    }
-    return { headers, body: bodyText };
+    // Fetch full raw message (capped) so we can parse multipart MIME and pick
+    // the right body part (text/plain preferred) with correct charset/encoding.
+    const resp = await this.cmd(`UID FETCH ${uid} (BODY.PEEK[]<0.200000>)`);
+    const litMatch = resp.match(/\{(\d+)\}\r\n/);
+    if (!litMatch) return { headers: {}, body: "" };
+    const start = (litMatch.index ?? 0) + litMatch[0].length;
+    const len = parseInt(litMatch[1], 10);
+    const raw = resp.slice(start, start + len);
+    const sepIdx = raw.indexOf("\r\n\r\n");
+    const headerText = sepIdx >= 0 ? raw.slice(0, sepIdx) : raw;
+    const bodyRaw = sepIdx >= 0 ? raw.slice(sepIdx + 4) : "";
+    const headers = parseHeaders(headerText);
+    return { headers, body: bodyRaw };
   }
   async markSeen(uid: number) { await this.cmd(`UID STORE ${uid} +FLAGS (\\Seen)`); }
   async logout() { try { await this.cmd("LOGOUT"); } catch { /* ignore */ } try { this.conn.close(); } catch { /* ignore */ } }
@@ -154,6 +142,114 @@ function stripHtml(s: string): string {
   return s.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+
+function parseHeaders(headerText: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const unfolded = headerText.replace(/\r\n[ \t]+/g, " ");
+  for (const line of unfolded.split(/\r\n/)) {
+    const idx = line.indexOf(":");
+    if (idx <= 0) continue;
+    const k = line.slice(0, idx).trim().toLowerCase();
+    const v = line.slice(idx + 1).trim();
+    headers[k] = headers[k] ? headers[k] + "\n" + v : v;
+  }
+  return headers;
+}
+
+function parseContentType(ct: string): { type: string; params: Record<string, string> } {
+  const parts = ct.split(";").map((s) => s.trim());
+  const type = (parts.shift() ?? "").toLowerCase();
+  const params: Record<string, string> = {};
+  for (const p of parts) {
+    const i = p.indexOf("=");
+    if (i < 0) continue;
+    params[p.slice(0, i).trim().toLowerCase()] = p.slice(i + 1).trim().replace(/^"|"$/g, "");
+  }
+  return { type, params };
+}
+
+function decodeBytes(bytes: Uint8Array, charset: string): string {
+  try { return new TextDecoder(charset || "utf-8").decode(bytes); }
+  catch { return new TextDecoder("utf-8").decode(bytes); }
+}
+
+function decodePart(body: string, encoding: string, charset: string): string {
+  const enc = (encoding || "7bit").toLowerCase();
+  if (enc === "base64") {
+    try {
+      const clean = body.replace(/\s+/g, "");
+      const bin = atob(clean);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return decodeBytes(bytes, charset);
+    } catch { return body; }
+  }
+  if (enc === "quoted-printable") {
+    const decoded = body.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+    const bytes = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i) & 0xff;
+    return decodeBytes(bytes, charset);
+  }
+  return body;
+}
+
+// Walk MIME tree and pick the best text part (prefer text/plain, fall back to text/html).
+function extractTextFromMime(rawBody: string, contentType: string): string {
+  const { type, params } = parseContentType(contentType || "text/plain");
+  if (type.startsWith("multipart/")) {
+    const boundary = params.boundary;
+    if (!boundary) return rawBody;
+    const marker = "--" + boundary;
+    const segments = rawBody.split(marker).slice(1, -1); // drop preamble and closing
+    let htmlFallback = "";
+    for (const seg of segments) {
+      const trimmed = seg.replace(/^\r?\n/, "");
+      const sep = trimmed.indexOf("\r\n\r\n");
+      if (sep < 0) continue;
+      const partHeaders = parseHeaders(trimmed.slice(0, sep));
+      const partBody = trimmed.slice(sep + 4).replace(/\r?\n--?$/, "");
+      const partCT = partHeaders["content-type"] ?? "text/plain";
+      const partEnc = partHeaders["content-transfer-encoding"] ?? "";
+      const { type: subType, params: subParams } = parseContentType(partCT);
+      if (subType.startsWith("multipart/")) {
+        const sub = extractTextFromMime(partBody, partCT);
+        if (sub.trim()) return sub;
+        continue;
+      }
+      if (subType === "text/plain") {
+        const dec = decodePart(partBody, partEnc, subParams.charset ?? "utf-8");
+        if (dec.trim()) return dec;
+      } else if (subType === "text/html" && !htmlFallback) {
+        const dec = decodePart(partBody, partEnc, subParams.charset ?? "utf-8");
+        htmlFallback = stripHtml(dec);
+      }
+    }
+    return htmlFallback;
+  }
+  return rawBody;
+}
+
+// Remove quoted reply / signature blocks so we keep only the new message.
+function stripQuotedReply(text: string): string {
+  const markers: RegExp[] = [
+    /^\s*Em\s.+escreveu\s*:?\s*$/im,                  // pt-BR Gmail
+    /^\s*On\s.+wrote\s*:?\s*$/im,                     // en Gmail
+    /^\s*Le\s.+a écrit\s*:?\s*$/im,                   // fr
+    /^\s*-{2,}\s*Mensagem (original|encaminhada)\s*-{2,}\s*$/im,
+    /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
+    /^\s*_{5,}\s*$/m,                                 // Outlook divider
+    /^\s*De\s*:\s.+$/im,                              // pt header block
+    /^\s*From\s*:\s.+$/im,                            // en header block
+    /^>.*$/m,                                         // first quoted line
+    /^\s*Protocolo\s+SAC\d{8}-[A-Z0-9]+/im,           // our own footer
+  ];
+  let cut = text.length;
+  for (const re of markers) {
+    const m = text.match(re);
+    if (m && (m.index ?? -1) >= 0 && m.index! < cut) cut = m.index!;
+  }
+  return text.slice(0, cut).replace(/[\s\n]+$/, "").trim();
 }
 
 Deno.serve(async (req) => {
@@ -238,10 +334,20 @@ Deno.serve(async (req) => {
           if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
 
-        // Body: try to decode QP; if HTML, strip; truncate
-        let text = body;
-        if (/<[a-z][\s\S]*>/i.test(text)) text = stripHtml(text);
-        text = decodeQP(text).trim().slice(0, 20_000) || "(sem conteúdo)";
+        // Decode MIME body: walk parts, prefer text/plain, fall back to HTML.
+        const ct = headers["content-type"] ?? "text/plain; charset=utf-8";
+        const cte = headers["content-transfer-encoding"] ?? "";
+        let text: string;
+        const { type: topType, params: topParams } = parseContentType(ct);
+        if (topType.startsWith("multipart/")) {
+          text = extractTextFromMime(body, ct);
+        } else if (topType === "text/html") {
+          text = stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
+        } else {
+          text = decodePart(body, cte, topParams.charset ?? "utf-8");
+        }
+        // Remove quoted previous-message blocks (Em ... escreveu:, >, From:, etc.)
+        text = stripQuotedReply(text).slice(0, 20_000) || "(sem conteúdo)";
 
         const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
         let sacRequestId: string | null = null;
