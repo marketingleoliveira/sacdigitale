@@ -672,7 +672,14 @@ export default function AdminDashboard() {
                           return (
                             <TableRow key={request.id}>
                               <TableCell className="font-mono text-sm">
-                                {request.protocol}
+                                <div className="flex flex-col gap-1">
+                                  {unreadByRequest[request.id] ? (
+                                    <Badge className="w-fit bg-emerald-600 hover:bg-emerald-600 text-white animate-pulse">
+                                      RESPONDIDO
+                                    </Badge>
+                                  ) : null}
+                                  <span>{request.protocol}</span>
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-col gap-1">
@@ -723,7 +730,7 @@ export default function AdminDashboard() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => setSelectedRequest(request)}
+                                    onClick={() => openRequest(request)}
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
