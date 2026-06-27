@@ -144,6 +144,110 @@ function stripHtml(s: string): string {
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
+function parseHeaders(headerText: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const unfolded = headerText.replace(/\r\n[ \t]+/g, " ");
+  for (const line of unfolded.split(/\r\n/)) {
+    const idx = line.indexOf(":");
+    if (idx <= 0) continue;
+    const k = line.slice(0, idx).trim().toLowerCase();
+    const v = line.slice(idx + 1).trim();
+    headers[k] = headers[k] ? headers[k] + "\n" + v : v;
+  }
+  return headers;
+}
+
+function parseContentType(ct: string): { type: string; params: Record<string, string> } {
+  const parts = ct.split(";").map((s) => s.trim());
+  const type = (parts.shift() ?? "").toLowerCase();
+  const params: Record<string, string> = {};
+  for (const p of parts) {
+    const i = p.indexOf("=");
+    if (i < 0) continue;
+    params[p.slice(0, i).trim().toLowerCase()] = p.slice(i + 1).trim().replace(/^"|"$/g, "");
+  }
+  return { type, params };
+}
+
+function decodeBytes(bytes: Uint8Array, charset: string): string {
+  try { return new TextDecoder(charset || "utf-8").decode(bytes); }
+  catch { return new TextDecoder("utf-8").decode(bytes); }
+}
+
+function decodePart(body: string, encoding: string, charset: string): string {
+  const enc = (encoding || "7bit").toLowerCase();
+  if (enc === "base64") {
+    try {
+      const clean = body.replace(/\s+/g, "");
+      const bin = atob(clean);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return decodeBytes(bytes, charset);
+    } catch { return body; }
+  }
+  if (enc === "quoted-printable") {
+    const decoded = body.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+    const bytes = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i) & 0xff;
+    return decodeBytes(bytes, charset);
+  }
+  return body;
+}
+
+// Walk MIME tree and pick the best text part (prefer text/plain, fall back to text/html).
+function extractTextFromMime(rawBody: string, contentType: string): string {
+  const { type, params } = parseContentType(contentType || "text/plain");
+  if (type.startsWith("multipart/")) {
+    const boundary = params.boundary;
+    if (!boundary) return rawBody;
+    const marker = "--" + boundary;
+    const segments = rawBody.split(marker).slice(1, -1); // drop preamble and closing
+    let htmlFallback = "";
+    for (const seg of segments) {
+      const trimmed = seg.replace(/^\r?\n/, "");
+      const sep = trimmed.indexOf("\r\n\r\n");
+      if (sep < 0) continue;
+      const partHeaders = parseHeaders(trimmed.slice(0, sep));
+      const partBody = trimmed.slice(sep + 4).replace(/\r?\n--?$/, "");
+      const partCT = partHeaders["content-type"] ?? "text/plain";
+      const sub = extractTextFromMime(partBody, partCT);
+      const { type: subType } = parseContentType(partCT);
+      if (subType === "text/plain" && sub.trim()) return sub;
+      if (subType === "text/html" && !htmlFallback) htmlFallback = stripHtml(sub);
+      if (subType.startsWith("multipart/") && sub.trim()) return sub;
+    }
+    return htmlFallback;
+  }
+  // leaf part — assume rawBody already has headers stripped by caller? In our
+  // walker we pass only the body portion, so just decode.
+  // (Top-level non-multipart messages also pass through here — rawBody is the
+  // body portion. We need encoding/charset from the outer headers; the caller
+  // supplies them by wrapping. For safety, default to identity here.)
+  return rawBody;
+}
+
+// Remove quoted reply / signature blocks so we keep only the new message.
+function stripQuotedReply(text: string): string {
+  const markers: RegExp[] = [
+    /^\s*Em\s.+escreveu\s*:?\s*$/im,                  // pt-BR Gmail
+    /^\s*On\s.+wrote\s*:?\s*$/im,                     // en Gmail
+    /^\s*Le\s.+a écrit\s*:?\s*$/im,                   // fr
+    /^\s*-{2,}\s*Mensagem (original|encaminhada)\s*-{2,}\s*$/im,
+    /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
+    /^\s*_{5,}\s*$/m,                                 // Outlook divider
+    /^\s*De\s*:\s.+$/im,                              // pt header block
+    /^\s*From\s*:\s.+$/im,                            // en header block
+    /^>.*$/m,                                         // first quoted line
+    /^\s*Protocolo\s+SAC\d{8}-[A-Z0-9]+/im,           // our own footer
+  ];
+  let cut = text.length;
+  for (const re of markers) {
+    const m = text.match(re);
+    if (m && (m.index ?? -1) >= 0 && m.index! < cut) cut = m.index!;
+  }
+  return text.slice(0, cut).replace(/[\s\n]+$/, "").trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
