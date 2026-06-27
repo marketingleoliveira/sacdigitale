@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Mail, MailOpen, Send, ArrowDownLeft, ArrowUpRight, Paperclip, X, FileIcon } from 'lucide-react';
+import { Loader2, Mail, MailOpen, Send, ArrowDownLeft, ArrowUpRight, Paperclip, X, FileIcon, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface EmailItem {
@@ -38,6 +38,7 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +50,26 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
     if (error) toast.error('Erro ao carregar e-mails');
     setEmails(((data as unknown) as EmailItem[]) || []);
     setLoading(false);
+  };
+
+  const syncInbox = async () => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('imap-poll-inbox', {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      });
+      if (error || (data as any)?.error) {
+        throw new Error((data as any)?.error || error?.message || 'Falha ao sincronizar');
+      }
+      const r = data as { linked?: number; unlinked?: number; processed?: number };
+      toast.success(`Sincronizado: ${r.processed ?? 0} lidos • ${r.linked ?? 0} vinculados`);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao sincronizar');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   useEffect(() => {
@@ -117,6 +138,10 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
         <Mail className="h-5 w-5 text-primary" />
         <h3 className="font-semibold">Comunicação Externa (E-mail)</h3>
         <Badge variant="secondary">{emails.length}</Badge>
+        <Button onClick={syncInbox} disabled={syncing} size="sm" variant="ghost" className="ml-auto h-7 gap-1 text-xs">
+          {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          Sincronizar respostas
+        </Button>
       </div>
 
       <ScrollArea className="h-[320px] rounded-lg border bg-muted/30 p-4">
