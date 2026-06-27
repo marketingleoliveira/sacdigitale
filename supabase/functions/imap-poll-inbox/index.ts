@@ -90,31 +90,19 @@ class ImapClient {
     return line.replace("* SEARCH", "").trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => !isNaN(n));
   }
   async fetchMessage(uid: number): Promise<{ headers: Record<string, string>; body: string }> {
-    const resp = await this.cmd(
-      `UID FETCH ${uid} (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO MESSAGE-ID DATE)] BODY.PEEK[TEXT]<0.30000>)`
-    );
-    // Extract literals: each BODY[...] section is followed by {N}\r\n<data>
-    const literals: string[] = [];
-    let i = 0;
-    while (true) {
-      const m = resp.slice(i).match(/\{(\d+)\}\r\n/);
-      if (!m) break;
-      const start = i + (m.index ?? 0) + m[0].length;
-      const len = parseInt(m[1], 10);
-      literals.push(resp.slice(start, start + len));
-      i = start + len;
-    }
-    const headerText = literals[0] ?? "";
-    const bodyText = literals[1] ?? "";
-    const headers: Record<string, string> = {};
-    // Unfold continuation lines and split by ': '
-    const unfolded = headerText.replace(/\r\n[ \t]+/g, " ");
-    for (const line of unfolded.split(/\r\n/)) {
-      const idx = line.indexOf(":");
-      if (idx <= 0) continue;
-      headers[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
-    }
-    return { headers, body: bodyText };
+    // Fetch full raw message (capped) so we can parse multipart MIME and pick
+    // the right body part (text/plain preferred) with correct charset/encoding.
+    const resp = await this.cmd(`UID FETCH ${uid} (BODY.PEEK[]<0.200000>)`);
+    const litMatch = resp.match(/\{(\d+)\}\r\n/);
+    if (!litMatch) return { headers: {}, body: "" };
+    const start = (litMatch.index ?? 0) + litMatch[0].length;
+    const len = parseInt(litMatch[1], 10);
+    const raw = resp.slice(start, start + len);
+    const sepIdx = raw.indexOf("\r\n\r\n");
+    const headerText = sepIdx >= 0 ? raw.slice(0, sepIdx) : raw;
+    const bodyRaw = sepIdx >= 0 ? raw.slice(sepIdx + 4) : "";
+    const headers = parseHeaders(headerText);
+    return { headers, body: bodyRaw };
   }
   async markSeen(uid: number) { await this.cmd(`UID STORE ${uid} +FLAGS (\\Seen)`); }
   async logout() { try { await this.cmd("LOGOUT"); } catch { /* ignore */ } try { this.conn.close(); } catch { /* ignore */ } }
