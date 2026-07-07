@@ -23,6 +23,8 @@ interface EmailItem {
   created_at: string;
   raw_payload?: { type?: string; source?: string } | null;
   attachments?: { filename: string; url: string; size?: number; content_type?: string }[];
+  sac_request_id: string | null;
+  _historical?: boolean;
 }
 
 const isTechnicalEmptyEvent = (email: EmailItem) =>
@@ -46,13 +48,29 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
 
   const load = async () => {
     setLoading(true);
+    const normalized = (recipientEmail || '').trim().toLowerCase();
     const { data, error } = await supabase
       .from('email_communications')
       .select('*')
-      .eq('sac_request_id', sacRequestId)
+      .or(
+        `sac_request_id.eq.${sacRequestId}` +
+          (normalized ? `,from_email.ilike.${normalized},to_email.ilike.${normalized}` : '')
+      )
       .order('created_at', { ascending: true });
     if (error) toast.error('Erro ao carregar e-mails');
-    const visibleEmails = (((data as unknown) as EmailItem[]) || []).filter((email) => !isTechnicalEmptyEvent(email));
+    const rows = ((data as unknown) as EmailItem[]) || [];
+    const seen = new Set<string>();
+    const visibleEmails = rows
+      .filter((email) => !isTechnicalEmptyEvent(email))
+      .filter((email) => {
+        if (seen.has(email.id)) return false;
+        seen.add(email.id);
+        return true;
+      })
+      .map((email) => ({
+        ...email,
+        _historical: email.sac_request_id !== sacRequestId,
+      }));
     setEmails(visibleEmails);
     setLoading(false);
   };
