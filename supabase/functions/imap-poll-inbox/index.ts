@@ -98,9 +98,10 @@ class ImapClient {
     const start = (litMatch.index ?? 0) + litMatch[0].length;
     const len = parseInt(litMatch[1], 10);
     const raw = resp.slice(start, start + len);
-    const sepIdx = raw.indexOf("\r\n\r\n");
+    const sepMatch = raw.match(/\r?\n\r?\n/);
+    const sepIdx = sepMatch?.index ?? -1;
     const headerText = sepIdx >= 0 ? raw.slice(0, sepIdx) : raw;
-    const bodyRaw = sepIdx >= 0 ? raw.slice(sepIdx + 4) : "";
+    const bodyRaw = sepIdx >= 0 ? raw.slice(sepIdx + sepMatch![0].length) : "";
     const headers = parseHeaders(headerText);
     return { headers, body: bodyRaw };
   }
@@ -140,14 +141,14 @@ function decodeQP(s: string): string {
 
 function stripHtml(s: string): string {
   return s.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, "")
+    .replace(/<\/(div|p|li|tr|h[1-6])>/gi, "\n").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
 function parseHeaders(headerText: string): Record<string, string> {
   const headers: Record<string, string> = {};
-  const unfolded = headerText.replace(/\r\n[ \t]+/g, " ");
-  for (const line of unfolded.split(/\r\n/)) {
+  const unfolded = headerText.replace(/\r?\n[ \t]+/g, " ");
+  for (const line of unfolded.split(/\r?\n/)) {
     const idx = line.indexOf(":");
     if (idx <= 0) continue;
     const k = line.slice(0, idx).trim().toLowerCase();
@@ -194,6 +195,20 @@ function decodePart(body: string, encoding: string, charset: string): string {
   return body;
 }
 
+function splitHeaderAndBody(rawPart: string): { headers: Record<string, string>; body: string } | null {
+  const normalized = rawPart.replace(/^\r?\n/, "");
+  const sep = normalized.match(/\r?\n\r?\n/);
+  if (!sep || sep.index === undefined) return null;
+  return {
+    headers: parseHeaders(normalized.slice(0, sep.index)),
+    body: normalized.slice(sep.index + sep[0].length),
+  };
+}
+
+function cleanMimeBoundaryTail(body: string): string {
+  return body.replace(/\r?\n--[^\r\n-]+--?\s*$/g, "").trimEnd();
+}
+
 // Walk MIME tree and pick the best text part (prefer text/plain, fall back to text/html).
 function extractTextFromMime(rawBody: string, contentType: string): string {
   const { type, params } = parseContentType(contentType || "text/plain");
@@ -209,11 +224,10 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
     const segments = rawSegments.filter((s) => !/^--\s*/.test(s));
     let htmlFallback = "";
     for (const seg of segments) {
-      const trimmed = seg.replace(/^\r?\n/, "");
-      const sep = trimmed.indexOf("\r\n\r\n");
-      if (sep < 0) continue;
-      const partHeaders = parseHeaders(trimmed.slice(0, sep));
-      const partBody = trimmed.slice(sep + 4).replace(/\r?\n--?$/, "");
+      const parsed = splitHeaderAndBody(seg);
+      if (!parsed) continue;
+      const partHeaders = parsed.headers;
+      const partBody = cleanMimeBoundaryTail(parsed.body);
       const partCT = partHeaders["content-type"] ?? "text/plain";
       const partEnc = partHeaders["content-transfer-encoding"] ?? "";
       const { type: subType, params: subParams } = parseContentType(partCT);
@@ -236,6 +250,21 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
     return stripHtml(rawBody);
   }
   return rawBody;
+}
+
+function extractReplyText(headers: Record<string, string>, body: string): string {
+  const ct = headers["content-type"] ?? "text/plain; charset=utf-8";
+  const cte = headers["content-transfer-encoding"] ?? "";
+  const { type: topType, params: topParams } = parseContentType(ct);
+  let text: string;
+  if (topType.startsWith("multipart/")) {
+    text = extractTextFromMime(body, ct);
+  } else if (topType === "text/html") {
+    text = stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
+  } else {
+    text = decodePart(body, cte, topParams.charset ?? "utf-8");
+  }
+  return stripQuotedReply(text).slice(0, 20_000).trim();
 }
 
 // Remove quoted reply / signature blocks so we keep only the new message.
@@ -325,7 +354,7 @@ Deno.serve(async (req) => {
   }
 
   const imap = new ImapClient();
-  let processed = 0, linked = 0, unlinked = 0, skipped = 0, failed = 0;
+  let processed = 0, linked = 0, unlinked = 0, skipped = 0, failed = 0, repaired = 0;
   const errors: string[] = [];
 
   try {
@@ -333,7 +362,22 @@ Deno.serve(async (req) => {
     await imap.login(user, pass);
     await imap.select("INBOX");
     const uids = await imap.searchUnseenUids();
-    const batch = uids.slice(0, 25);
+    const { data: emptyRows } = await admin
+      .from("email_communications")
+      .select("id, raw_payload")
+      .eq("direction", "inbound")
+      .eq("body", "(sem conteúdo)")
+      .not("raw_payload->>uid", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    const repairByUid = new Map<number, string>();
+    for (const row of emptyRows ?? []) {
+      const uid = Number((row.raw_payload as { uid?: unknown } | null)?.uid);
+      if (Number.isFinite(uid)) repairByUid.set(uid, row.id as string);
+    }
+
+    const batch = Array.from(new Set([...uids, ...repairByUid.keys()])).slice(0, 35);
 
     for (const uid of batch) {
       processed++;
@@ -351,20 +395,23 @@ Deno.serve(async (req) => {
           if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
 
-        // Decode MIME body: walk parts, prefer text/plain, fall back to HTML.
-        const ct = headers["content-type"] ?? "text/plain; charset=utf-8";
-        const cte = headers["content-transfer-encoding"] ?? "";
-        let text: string;
-        const { type: topType, params: topParams } = parseContentType(ct);
-        if (topType.startsWith("multipart/")) {
-          text = extractTextFromMime(body, ct);
-        } else if (topType === "text/html") {
-          text = stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
-        } else {
-          text = decodePart(body, cte, topParams.charset ?? "utf-8");
+        const text = extractReplyText(headers, body);
+
+        const repairId = repairByUid.get(uid);
+        if (repairId) {
+          if (text) {
+            const { error: updErr } = await admin
+              .from("email_communications")
+              .update({ body: text, raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null, repaired_at: new Date().toISOString() } })
+              .eq("id", repairId)
+              .eq("body", "(sem conteúdo)");
+            if (updErr) { failed++; errors.push(`uid ${uid}: ${updErr.message}`); continue; }
+            repaired++;
+          } else {
+            skipped++;
+          }
+          continue;
         }
-        // Remove quoted previous-message blocks (Em ... escreveu:, >, From:, etc.)
-        text = stripQuotedReply(text).slice(0, 20_000) || "(sem conteúdo)";
 
         const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
         let sacRequestId: string | null = null;
@@ -381,7 +428,7 @@ Deno.serve(async (req) => {
           from_email: from || "desconhecido",
           to_email: to,
           subject,
-          body: text,
+          body: text || "(sem conteúdo)",
           status: sacRequestId ? "received" : "unlinked",
           resend_id: messageId,
           raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null },
@@ -406,7 +453,7 @@ Deno.serve(async (req) => {
   }
 
   return new Response(JSON.stringify({
-    success: true, processed, linked, unlinked, skipped, failed,
+    success: true, processed, linked, unlinked, skipped, repaired, failed,
     ...(errors.length ? { errors } : {}),
   }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });
