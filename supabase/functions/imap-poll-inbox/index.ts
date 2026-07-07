@@ -367,7 +367,6 @@ Deno.serve(async (req) => {
       .select("id, raw_payload")
       .eq("direction", "inbound")
       .eq("body", "(sem conteúdo)")
-      .not("raw_payload->>uid", "is", null)
       .order("created_at", { ascending: false })
       .limit(25);
 
@@ -388,13 +387,6 @@ Deno.serve(async (req) => {
         const to = extractEmail(decodeMimeHeader(headers["to"] ?? "")) || user;
         const messageId = (headers["message-id"] ?? "").replace(/[<>]/g, "").trim() || null;
 
-        // Idempotency
-        if (messageId) {
-          const { data: existing } = await admin
-            .from("email_communications").select("id").eq("resend_id", messageId).maybeSingle();
-          if (existing) { await imap.markSeen(uid); skipped++; continue; }
-        }
-
         const text = extractReplyText(headers, body);
 
         const repairId = repairByUid.get(uid);
@@ -411,6 +403,15 @@ Deno.serve(async (req) => {
             skipped++;
           }
           continue;
+        }
+
+        // Idempotency for normal new inbound messages. This must run after
+        // the repair path, otherwise previously stored placeholders can never
+        // be corrected because their message-id already exists.
+        if (messageId) {
+          const { data: existing } = await admin
+            .from("email_communications").select("id").eq("resend_id", messageId).maybeSingle();
+          if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
 
         const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
