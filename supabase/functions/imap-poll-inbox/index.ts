@@ -201,7 +201,12 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
     const boundary = params.boundary;
     if (!boundary) return rawBody;
     const marker = "--" + boundary;
-    const segments = rawBody.split(marker).slice(1, -1); // drop preamble and closing
+    // Drop preamble (before first boundary). Keep the rest; the closing
+    // boundary ("--boundary--") is filtered per-segment below. Using
+    // slice(1) instead of slice(1,-1) survives truncated messages that
+    // lack the closing marker.
+    const rawSegments = rawBody.split(marker).slice(1);
+    const segments = rawSegments.filter((s) => !/^--\s*/.test(s));
     let htmlFallback = "";
     for (const seg of segments) {
       const trimmed = seg.replace(/^\r?\n/, "");
@@ -225,7 +230,10 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
         htmlFallback = stripHtml(dec);
       }
     }
-    return htmlFallback;
+    if (htmlFallback) return htmlFallback;
+    // Last-resort fallback: strip HTML off the raw body so we never
+    // return an empty string for a message that clearly has content.
+    return stripHtml(rawBody);
   }
   return rawBody;
 }
