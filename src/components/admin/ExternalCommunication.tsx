@@ -23,6 +23,8 @@ interface EmailItem {
   created_at: string;
   raw_payload?: { type?: string; source?: string } | null;
   attachments?: { filename: string; url: string; size?: number; content_type?: string }[];
+  sac_request_id: string | null;
+  _historical?: boolean;
 }
 
 const isTechnicalEmptyEvent = (email: EmailItem) =>
@@ -46,13 +48,29 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
 
   const load = async () => {
     setLoading(true);
+    const normalized = (recipientEmail || '').trim().toLowerCase();
     const { data, error } = await supabase
       .from('email_communications')
       .select('*')
-      .eq('sac_request_id', sacRequestId)
+      .or(
+        `sac_request_id.eq.${sacRequestId}` +
+          (normalized ? `,from_email.ilike.${normalized},to_email.ilike.${normalized}` : '')
+      )
       .order('created_at', { ascending: true });
     if (error) toast.error('Erro ao carregar e-mails');
-    const visibleEmails = (((data as unknown) as EmailItem[]) || []).filter((email) => !isTechnicalEmptyEvent(email));
+    const rows = ((data as unknown) as EmailItem[]) || [];
+    const seen = new Set<string>();
+    const visibleEmails = rows
+      .filter((email) => !isTechnicalEmptyEvent(email))
+      .filter((email) => {
+        if (seen.has(email.id)) return false;
+        seen.add(email.id);
+        return true;
+      })
+      .map((email) => ({
+        ...email,
+        _historical: email.sac_request_id !== sacRequestId,
+      }));
     setEmails(visibleEmails);
     setLoading(false);
   };
@@ -160,7 +178,7 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
         ) : (
           <div className="space-y-3">
             {emails.map((e) => (
-              <Card key={e.id} className={e.direction === 'outbound' ? 'border-blue-200' : 'border-green-200'}>
+              <Card key={e.id} className={`${e.direction === 'outbound' ? 'border-blue-200' : 'border-green-200'} ${e._historical ? 'opacity-90 bg-muted/30' : ''}`}>
                 <CardContent className="p-3 space-y-2">
                   <div className="flex items-center gap-2 text-xs">
                     {e.direction === 'outbound' ? (
@@ -170,6 +188,11 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
                     )}
                     <span className="text-muted-foreground">{fmt(e.created_at)}</span>
                     {e.status === 'failed' && <Badge variant="destructive">Falhou</Badge>}
+                    {e._historical && (
+                      <Badge variant="secondary" className="gap-1" title="E-mail de outra solicitação com o mesmo cliente">
+                        Histórico
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     <strong>De:</strong> {e.from_email} • <strong>Para:</strong> {e.to_email}
