@@ -252,19 +252,30 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
   return rawBody;
 }
 
-function extractReplyText(headers: Record<string, string>, body: string): string {
+function extractReadableText(headers: Record<string, string>, body: string): string {
   const ct = headers["content-type"] ?? "text/plain; charset=utf-8";
   const cte = headers["content-transfer-encoding"] ?? "";
   const { type: topType, params: topParams } = parseContentType(ct);
-  let text: string;
   if (topType.startsWith("multipart/")) {
-    text = extractTextFromMime(body, ct);
-  } else if (topType === "text/html") {
-    text = stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
-  } else {
-    text = decodePart(body, cte, topParams.charset ?? "utf-8");
+    return extractTextFromMime(body, ct);
   }
+  if (topType === "text/html") {
+    return stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
+  }
+  return decodePart(body, cte, topParams.charset ?? "utf-8");
+}
+
+function extractReplyText(headers: Record<string, string>, body: string): string {
+  const text = extractReadableText(headers, body);
   return stripQuotedReply(text).slice(0, 20_000).trim();
+}
+
+function findProtocol(...values: string[]): string | null {
+  for (const value of values) {
+    const match = value.match(/SAC\d{8}-[A-Z0-9]+/i);
+    if (match) return match[0].toUpperCase();
+  }
+  return null;
 }
 
 // Remove quoted reply / signature blocks so we keep only the new message.
@@ -387,7 +398,8 @@ Deno.serve(async (req) => {
         const to = extractEmail(decodeMimeHeader(headers["to"] ?? "")) || user;
         const messageId = (headers["message-id"] ?? "").replace(/[<>]/g, "").trim() || null;
 
-        const text = extractReplyText(headers, body);
+        const fullText = extractReadableText(headers, body);
+        const text = stripQuotedReply(fullText).slice(0, 20_000).trim();
 
         const repairId = repairByUid.get(uid);
         if (repairId) {
@@ -414,10 +426,9 @@ Deno.serve(async (req) => {
           if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
 
-        const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
+        const protocol = findProtocol(subject, fullText, body);
         let sacRequestId: string | null = null;
-        if (match) {
-          const protocol = match[0].toUpperCase();
+        if (protocol) {
           const { data: sac } = await admin
             .from("sac_requests").select("id").eq("protocol", protocol).maybeSingle();
           sacRequestId = sac?.id ?? null;
