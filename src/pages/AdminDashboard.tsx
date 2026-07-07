@@ -235,6 +235,7 @@ export default function AdminDashboard() {
       .from('email_communications')
       .select('sac_request_id')
       .eq('direction', 'inbound')
+      .neq('body', '(sem conteúdo)')
       .is('read_at', null)
       .not('sac_request_id', 'is', null);
     if (error) { console.error(error); return; }

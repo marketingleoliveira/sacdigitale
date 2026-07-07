@@ -21,8 +21,12 @@ interface EmailItem {
   sent_by_email: string | null;
   error_message: string | null;
   created_at: string;
+  raw_payload?: { type?: string; source?: string } | null;
   attachments?: { filename: string; url: string; size?: number; content_type?: string }[];
 }
+
+const isTechnicalEmptyEvent = (email: EmailItem) =>
+  email.body === '(sem conteúdo)' && email.raw_payload?.type?.startsWith('email.');
 
 interface Props {
   sacRequestId: string;
@@ -48,7 +52,8 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
       .eq('sac_request_id', sacRequestId)
       .order('created_at', { ascending: true });
     if (error) toast.error('Erro ao carregar e-mails');
-    setEmails(((data as unknown) as EmailItem[]) || []);
+    const visibleEmails = (((data as unknown) as EmailItem[]) || []).filter((email) => !isTechnicalEmptyEvent(email));
+    setEmails(visibleEmails);
     setLoading(false);
   };
 

@@ -252,19 +252,30 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
   return rawBody;
 }
 
-function extractReplyText(headers: Record<string, string>, body: string): string {
+function extractReadableText(headers: Record<string, string>, body: string): string {
   const ct = headers["content-type"] ?? "text/plain; charset=utf-8";
   const cte = headers["content-transfer-encoding"] ?? "";
   const { type: topType, params: topParams } = parseContentType(ct);
-  let text: string;
   if (topType.startsWith("multipart/")) {
-    text = extractTextFromMime(body, ct);
-  } else if (topType === "text/html") {
-    text = stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
-  } else {
-    text = decodePart(body, cte, topParams.charset ?? "utf-8");
+    return extractTextFromMime(body, ct);
   }
+  if (topType === "text/html") {
+    return stripHtml(decodePart(body, cte, topParams.charset ?? "utf-8"));
+  }
+  return decodePart(body, cte, topParams.charset ?? "utf-8");
+}
+
+function extractReplyText(headers: Record<string, string>, body: string): string {
+  const text = extractReadableText(headers, body);
   return stripQuotedReply(text).slice(0, 20_000).trim();
+}
+
+function findProtocol(...values: string[]): string | null {
+  for (const value of values) {
+    const match = value.match(/SAC\d{8}-[A-Z0-9]+/i);
+    if (match) return match[0].toUpperCase();
+  }
+  return null;
 }
 
 // Remove quoted reply / signature blocks so we keep only the new message.
@@ -362,18 +373,24 @@ Deno.serve(async (req) => {
     await imap.login(user, pass);
     await imap.select("INBOX");
     const uids = await imap.searchUnseenUids();
-    const { data: emptyRows } = await admin
+    const { data: repairRows } = await admin
       .from("email_communications")
-      .select("id, raw_payload")
+      .select("id, raw_payload, body, sac_request_id")
       .eq("direction", "inbound")
-      .eq("body", "(sem conteúdo)")
+      .or("body.eq.(sem conteúdo),sac_request_id.is.null")
       .order("created_at", { ascending: false })
       .limit(25);
 
-    const repairByUid = new Map<number, string>();
-    for (const row of emptyRows ?? []) {
+    const repairByUid = new Map<number, { id: string; body: string; sac_request_id: string | null }>();
+    for (const row of repairRows ?? []) {
       const uid = Number((row.raw_payload as { uid?: unknown } | null)?.uid);
-      if (Number.isFinite(uid)) repairByUid.set(uid, row.id as string);
+      if (Number.isFinite(uid)) {
+        repairByUid.set(uid, {
+          id: row.id as string,
+          body: row.body as string,
+          sac_request_id: (row.sac_request_id as string | null) ?? null,
+        });
+      }
     }
 
     const batch = Array.from(new Set([...uids, ...repairByUid.keys()])).slice(0, 35);
@@ -387,16 +404,32 @@ Deno.serve(async (req) => {
         const to = extractEmail(decodeMimeHeader(headers["to"] ?? "")) || user;
         const messageId = (headers["message-id"] ?? "").replace(/[<>]/g, "").trim() || null;
 
-        const text = extractReplyText(headers, body);
+        const fullText = extractReadableText(headers, body);
+        const text = stripQuotedReply(fullText).slice(0, 20_000).trim();
+        const protocol = findProtocol(subject, fullText, body);
+        let sacRequestId: string | null = null;
+        if (protocol) {
+          const { data: sac } = await admin
+            .from("sac_requests").select("id").eq("protocol", protocol).maybeSingle();
+          sacRequestId = sac?.id ?? null;
+        }
 
-        const repairId = repairByUid.get(uid);
-        if (repairId) {
-          if (text) {
+        const repairCandidate = repairByUid.get(uid);
+        if (repairCandidate) {
+          const patch: Record<string, unknown> = {
+            raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null, repaired_at: new Date().toISOString() },
+          };
+          if (text && repairCandidate.body === "(sem conteúdo)") patch.body = text;
+          if (sacRequestId && !repairCandidate.sac_request_id) {
+            patch.sac_request_id = sacRequestId;
+            patch.status = "received";
+          }
+
+          if (Object.keys(patch).length > 1) {
             const { error: updErr } = await admin
               .from("email_communications")
-              .update({ body: text, raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null, repaired_at: new Date().toISOString() } })
-              .eq("id", repairId)
-              .eq("body", "(sem conteúdo)");
+              .update(patch)
+              .eq("id", repairCandidate.id);
             if (updErr) { failed++; errors.push(`uid ${uid}: ${updErr.message}`); continue; }
             repaired++;
           } else {
@@ -412,15 +445,6 @@ Deno.serve(async (req) => {
           const { data: existing } = await admin
             .from("email_communications").select("id").eq("resend_id", messageId).maybeSingle();
           if (existing) { await imap.markSeen(uid); skipped++; continue; }
-        }
-
-        const match = subject.match(/SAC\d{8}-[A-Z0-9]+/i);
-        let sacRequestId: string | null = null;
-        if (match) {
-          const protocol = match[0].toUpperCase();
-          const { data: sac } = await admin
-            .from("sac_requests").select("id").eq("protocol", protocol).maybeSingle();
-          sacRequestId = sac?.id ?? null;
         }
 
         const { error: insErr } = await admin.from("email_communications").insert({
