@@ -178,7 +178,7 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
         ) : (
           <div className="space-y-3">
             {emails.map((e) => (
-              <Card key={e.id} className={e.direction === 'outbound' ? 'border-blue-200' : 'border-green-200'}>
+              <Card key={e.id} className={`${e.direction === 'outbound' ? 'border-blue-200' : 'border-green-200'} ${e._historical ? 'opacity-90 bg-muted/30' : ''}`}>
                 <CardContent className="p-3 space-y-2">
                   <div className="flex items-center gap-2 text-xs">
                     {e.direction === 'outbound' ? (
@@ -188,6 +188,11 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
                     )}
                     <span className="text-muted-foreground">{fmt(e.created_at)}</span>
                     {e.status === 'failed' && <Badge variant="destructive">Falhou</Badge>}
+                    {e._historical && (
+                      <Badge variant="secondary" className="gap-1" title="E-mail de outra solicitação com o mesmo cliente">
+                        Histórico
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     <strong>De:</strong> {e.from_email} • <strong>Para:</strong> {e.to_email}
