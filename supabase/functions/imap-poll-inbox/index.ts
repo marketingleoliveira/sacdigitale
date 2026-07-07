@@ -201,7 +201,12 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
     const boundary = params.boundary;
     if (!boundary) return rawBody;
     const marker = "--" + boundary;
-    const segments = rawBody.split(marker).slice(1, -1); // drop preamble and closing
+    // Drop preamble (before first boundary). Keep the rest; the closing
+    // boundary ("--boundary--") is filtered per-segment below. Using
+    // slice(1) instead of slice(1,-1) survives truncated messages that
+    // lack the closing marker.
+    const rawSegments = rawBody.split(marker).slice(1);
+    const segments = rawSegments.filter((s) => !/^--\s*/.test(s));
     let htmlFallback = "";
     for (const seg of segments) {
       const trimmed = seg.replace(/^\r?\n/, "");
@@ -225,38 +230,43 @@ function extractTextFromMime(rawBody: string, contentType: string): string {
         htmlFallback = stripHtml(dec);
       }
     }
-    return htmlFallback;
+    if (htmlFallback) return htmlFallback;
+    // Last-resort fallback: strip HTML off the raw body so we never
+    // return an empty string for a message that clearly has content.
+    return stripHtml(rawBody);
   }
   return rawBody;
 }
 
 // Remove quoted reply / signature blocks so we keep only the new message.
 function stripQuotedReply(text: string): string {
-  // Allow the attribution line to wrap across lines (e.g. "Em sáb. ...\n
-  // <email> escreveu:") by using [\s\S] between the keyword and the verb.
+  // Require a preceding newline so a message that BEGINS with a quoted
+  // block (top-quoted or empty reply) doesn't collapse to nothing.
   const markers: RegExp[] = [
-    /(^|\n)\s*Em\s[\s\S]{0,400}?escreveu\s*:?/i,                 // pt-BR Gmail
-    /(^|\n)\s*On\s[\s\S]{0,400}?wrote\s*:?/i,                    // en Gmail
-    /(^|\n)\s*Le\s[\s\S]{0,400}?a écrit\s*:?/i,                  // fr
-    /(^|\n)\s*-{2,}\s*Mensagem (original|encaminhada)\s*-{2,}/i,
-    /(^|\n)\s*-{2,}\s*Original Message\s*-{2,}/i,
-    /(^|\n)\s*_{5,}\s*(\n|$)/,                                   // Outlook divider
-    /(^|\n)\s*De\s*:\s.+/i,                                      // pt header block
-    /(^|\n)\s*From\s*:\s.+/i,                                    // en header block
-    /(^|\n)>.*/,                                                 // first quoted line
-    /(^|\n)\s*Protocolo\s+SAC\d{8}-[A-Z0-9]+/i,                  // our own footer
+    /\n\s*Em\s[\s\S]{0,400}?escreveu\s*:?/i,                     // pt-BR Gmail
+    /\n\s*On\s[\s\S]{0,400}?wrote\s*:?/i,                        // en Gmail
+    /\n\s*Le\s[\s\S]{0,400}?a écrit\s*:?/i,                      // fr
+    /\n\s*-{2,}\s*Mensagem (original|encaminhada)\s*-{2,}/i,
+    /\n\s*-{2,}\s*Original Message\s*-{2,}/i,
+    /\n\s*_{5,}\s*(\n|$)/,                                       // Outlook divider
+    /\n\s*(De|From)\s*:\s*.+\n\s*(Enviad[ao]|Sent|Para|To)\s*:/i, // header block
+    /\n\s*Protocolo\s+SAC\d{8}-[A-Z0-9]+/i,                      // our own footer
   ];
   let cut = text.length;
   for (const re of markers) {
     const m = text.match(re);
     if (m && (m.index ?? -1) >= 0) {
-      // m.index points at the leading newline; advance past it so we keep
-      // the preceding content intact.
-      const start = m.index! + (m[1] === "\n" ? 1 : 0);
+      const start = m.index! + 1; // skip the leading \n, keep content before
       if (start < cut) cut = start;
     }
   }
-  return text.slice(0, cut).replace(/[\s\n]+$/, "").trim();
+  // Also trim trailing block of consecutive ">" quoted lines.
+  const sliced = text.slice(0, cut);
+  const quotedTail = sliced.match(/\n(\s*>.*(\n|$))+\s*$/);
+  const finalCut = quotedTail ? sliced.slice(0, quotedTail.index!) : sliced;
+  const cleaned = finalCut.replace(/[\s\n]+$/, "").trim();
+  // Fallback: if aggressive stripping nuked everything, keep the original.
+  return cleaned || text.trim();
 }
 
 Deno.serve(async (req) => {
