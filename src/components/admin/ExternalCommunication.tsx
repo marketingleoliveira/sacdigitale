@@ -62,8 +62,8 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
       if (error || (data as any)?.error) {
         throw new Error((data as any)?.error || error?.message || 'Falha ao sincronizar');
       }
-      const r = data as { linked?: number; unlinked?: number; processed?: number };
-      toast.success(`Sincronizado: ${r.processed ?? 0} lidos • ${r.linked ?? 0} vinculados`);
+      const r = data as { linked?: number; unlinked?: number; processed?: number; repaired?: number };
+      toast.success(`Sincronizado: ${r.processed ?? 0} lidos • ${r.linked ?? 0} vinculados • ${r.repaired ?? 0} reparados`);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erro ao sincronizar');
