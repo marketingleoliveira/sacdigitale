@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const getRequestingUserId = async (authHeader: string, supabaseAdmin: ReturnType<typeof createClient>) => {
+const getRequestingUserId = async (authHeader: string) => {
   if (!authHeader.startsWith("Bearer ")) {
     throw new Error("Token inválido");
   }
@@ -16,12 +16,19 @@ const getRequestingUserId = async (authHeader: string, supabaseAdmin: ReturnType
     throw new Error("Token inválido");
   }
 
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !data.user) {
+  const authClient = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const { data, error } = await authClient.auth.getClaims(token);
+  const userId = data?.claims?.sub as string | undefined;
+  if (error || !userId) {
     throw new Error("Token inválido");
   }
 
-  return data.user.id;
+  return userId;
 };
 
 serve(async (req) => {
@@ -46,7 +53,7 @@ serve(async (req) => {
 
     let requestingUserId: string;
     try {
-      requestingUserId = await getRequestingUserId(authHeader, supabaseAdmin);
+      requestingUserId = await getRequestingUserId(authHeader);
     } catch (authError) {
       console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Token inválido" }), {
