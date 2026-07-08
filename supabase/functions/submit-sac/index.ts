@@ -105,19 +105,35 @@ const handler = async (req: Request): Promise<Response> => {
             <hr>
             <div style="font-size:11px;color:#888">Digitale Têxtil — SAC Qualidade</div>
           </div>`;
+        const confSubject = `[${protocol}] Recebemos sua solicitação — em análise`;
         const r = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             from: FROM,
             to: [requestData.email],
-            bcc: ["qualidade@digitaletextil.com.br"],
             reply_to: FROM,
-            subject: `[${protocol}] Recebemos sua solicitação — em análise`,
+            subject: confSubject,
             html,
           }),
         });
-        if (!r.ok) console.error("submit-sac confirmation email failed:", await r.text());
+        if (!r.ok) {
+          console.error("submit-sac confirmation email failed:", await r.text());
+        } else {
+          // Log as OUTBOUND in the thread so it appears as "Enviado" in the admin UI
+          // (and so qualidade@ inbox does not receive/duplicate it as "Recebido").
+          await supabase.from("email_communications").insert({
+            sac_request_id: sacData.id,
+            direction: "outbound",
+            from_email: "qualidade@digitaletextil.com.br",
+            to_email: requestData.email,
+            subject: confSubject,
+            body: `Olá ${requestData.name},\n\nRecebemos sua solicitação e ela está sendo analisada pela nossa equipe de qualidade. Responderemos em breve pelo mesmo canal.\n\nProtocolo: ${protocol}\nAssunto: ${requestData.subject}`,
+            status: "sent",
+            sent_by_email: "sistema@digitaletextil.com.br",
+            raw_payload: { type: "sac.confirmation", source: "submit-sac" },
+          });
+        }
       }
     } catch (e) {
       console.error("submit-sac confirmation email error:", e);
