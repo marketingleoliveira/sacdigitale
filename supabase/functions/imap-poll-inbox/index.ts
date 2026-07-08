@@ -447,16 +447,25 @@ Deno.serve(async (req) => {
           if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
 
+        // Auto-classify direction based on flow:
+        // - If the sender is one of our own outgoing addresses (qualidade/gerente@digitaletextil.com.br),
+        //   this is a copy of a message WE sent → classify as OUTBOUND (Enviado).
+        // - Otherwise it's a real customer reply → INBOUND (Recebido).
+        const OWN_ADDRESSES = ["qualidade@digitaletextil.com.br", "gerente@digitaletextil.com.br"];
+        const fromNormalized = (from || "").toLowerCase();
+        const isOwnSender = OWN_ADDRESSES.some((a) => fromNormalized.includes(a));
+        const direction: "inbound" | "outbound" = isOwnSender ? "outbound" : "inbound";
+
         const { error: insErr } = await admin.from("email_communications").insert({
           sac_request_id: sacRequestId,
-          direction: "inbound",
+          direction,
           from_email: from || "desconhecido",
           to_email: to,
           subject,
           body: text || "(sem conteúdo)",
-          status: sacRequestId ? "received" : "unlinked",
+          status: sacRequestId ? (direction === "outbound" ? "sent" : "received") : "unlinked",
           resend_id: messageId,
-          raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null },
+          raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null, auto_classified: direction },
         });
         if (insErr) { failed++; errors.push(`uid ${uid}: ${insErr.message}`); continue; }
 
