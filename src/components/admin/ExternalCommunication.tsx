@@ -45,6 +45,7 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [emailsEnabled, setEmailsEnabled] = useState<boolean | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -97,6 +98,16 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
 
   useEffect(() => {
     load();
+    const loadStatus = async () => {
+      const { data } = await supabase
+        .from('email_settings')
+        .select('emails_enabled')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      setEmailsEnabled((data as { emails_enabled?: boolean } | null)?.emails_enabled ?? true);
+    };
+    loadStatus();
     const channel = supabase
       .channel(`emails-${sacRequestId}`)
       .on('postgres_changes', {
@@ -104,7 +115,11 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
         filter: `sac_request_id=eq.${sacRequestId}`,
       }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const settingsChannel = supabase
+      .channel(`email-settings-${sacRequestId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'email_settings' }, loadStatus)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(settingsChannel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sacRequestId]);
 
@@ -161,6 +176,20 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
         <Mail className="h-5 w-5 text-primary" />
         <h3 className="font-semibold">Comunicação Externa (E-mail)</h3>
         <Badge variant="secondary">{emails.length}</Badge>
+        {emailsEnabled !== null && (
+          <Badge
+            variant="outline"
+            className={
+              emailsEnabled
+                ? 'gap-1 border-green-300 text-green-700 bg-green-50'
+                : 'gap-1 border-red-300 text-red-700 bg-red-50'
+            }
+            title={emailsEnabled ? 'Envio de e-mails ativo' : 'Envio de e-mails desativado nas configurações'}
+          >
+            <span className={`h-2 w-2 rounded-full ${emailsEnabled ? 'bg-green-500' : 'bg-red-500'}`} />
+            Sistema {emailsEnabled ? 'ONLINE' : 'OFFLINE'}
+          </Badge>
+        )}
         <Button onClick={syncInbox} disabled={syncing} size="sm" variant="ghost" className="ml-auto h-7 gap-1 text-xs">
           {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
           Sincronizar respostas
