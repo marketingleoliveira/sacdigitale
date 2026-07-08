@@ -66,6 +66,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { LayoutDashboard, Mail } from 'lucide-react';
+import { EyeOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import ExternalCommunication from '@/components/admin/ExternalCommunication';
@@ -95,7 +97,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function AdminDashboard() {
-  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, signOut } = useAuth();
+  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, isVendas, signOut } = useAuth();
   const { showWarning, remainingSeconds, dismissWarning, logout } = useInactivityLogout({
     timeoutMinutes: 10,
     warningMinutes: 5,
@@ -112,6 +114,8 @@ export default function AdminDashboard() {
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
+  const [viewMode, setViewMode] = useState<boolean>(false);
+  const readOnly = isVendas || viewMode;
 
   useEffect(() => {
     setInvoiceDraft(selectedRequest?.order_number || '');
@@ -455,31 +459,37 @@ export default function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="summary" className="space-y-6">
+        <Tabs defaultValue={isVendas ? 'requests' : 'summary'} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="summary" className="gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Resumo
-            </TabsTrigger>
+            {!isVendas && (
+              <TabsTrigger value="summary" className="gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                Resumo
+              </TabsTrigger>
+            )}
             <TabsTrigger value="requests" className="gap-2">
               <Inbox className="h-4 w-4" />
               Solicitações
             </TabsTrigger>
-            {canManageUsers && (
+            {canManageUsers && !isVendas && (
               <TabsTrigger value="users" className="gap-2">
                 <Users className="h-4 w-4" />
                 Usuários
               </TabsTrigger>
             )}
-            <TabsTrigger value="reports" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Relatórios
-            </TabsTrigger>
-            <TabsTrigger value="complaint-types" className="gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Tipos de Reclamação
-            </TabsTrigger>
-            {canManageUsers && (
+            {!isVendas && (
+              <TabsTrigger value="reports" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Relatórios
+              </TabsTrigger>
+            )}
+            {!isVendas && (
+              <TabsTrigger value="complaint-types" className="gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Tipos de Reclamação
+              </TabsTrigger>
+            )}
+            {canManageUsers && !isVendas && (
               <TabsTrigger value="external-settings" className="gap-2">
                 <Mail className="h-4 w-4" />
                 Configurações Externas
@@ -487,9 +497,11 @@ export default function AdminDashboard() {
             )}
           </TabsList>
 
-          <TabsContent value="summary">
-            <MonthSummary />
-          </TabsContent>
+          {!isVendas && (
+            <TabsContent value="summary">
+              <MonthSummary />
+            </TabsContent>
+          )}
 
           <TabsContent value="requests" className="space-y-6">
             {/* Stats */}
@@ -775,21 +787,25 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {canManageUsers && (
+          {canManageUsers && !isVendas && (
             <TabsContent value="users">
               <UserManagement />
             </TabsContent>
           )}
 
-          <TabsContent value="reports">
-            <MonthlyReports />
-          </TabsContent>
+          {!isVendas && (
+            <TabsContent value="reports">
+              <MonthlyReports />
+            </TabsContent>
+          )}
 
-          <TabsContent value="complaint-types">
-            <ComplaintTypesManagement />
-          </TabsContent>
+          {!isVendas && (
+            <TabsContent value="complaint-types">
+              <ComplaintTypesManagement />
+            </TabsContent>
+          )}
 
-          {canManageUsers && (
+          {canManageUsers && !isVendas && (
             <TabsContent value="external-settings">
               <ExternalSettings />
             </TabsContent>
