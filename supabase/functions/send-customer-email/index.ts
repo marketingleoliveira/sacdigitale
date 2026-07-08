@@ -71,13 +71,25 @@ serve(async (req) => {
     // Load BCC settings (configurable via admin UI; falls back to env default)
     const { data: settings } = await admin
       .from("email_settings")
-      .select("bcc_enabled, bcc_email")
+      .select("bcc_enabled, bcc_email, emails_enabled, self_copy_enabled")
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
+    const emailsEnabled = settings?.emails_enabled ?? true;
+    if (!emailsEnabled) {
+      return new Response(JSON.stringify({ error: "Envio de e-mails está desativado nas configurações." }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const bccEnabled = settings?.bcc_enabled ?? true;
     const bccEmail = (settings?.bcc_email ?? DEFAULT_BCC_EMAIL)?.trim() || null;
     const useBcc = bccEnabled && bccEmail;
+    const selfCopy = settings?.self_copy_enabled ?? true;
+    // Sender receipt: send a copy back to the sending mailbox itself (qualidade@).
+    const SENDER_ADDR = "qualidade@digitaletextil.com.br";
+    const bccList: string[] = [];
+    if (useBcc) bccList.push(bccEmail!);
+    if (selfCopy) bccList.push(SENDER_ADDR);
 
     const finalSubject = subject.includes(`[${protocol}]`) ? subject : `[${protocol}] ${subject}`;
     const htmlBody = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.5;white-space:pre-wrap">${
@@ -91,7 +103,7 @@ serve(async (req) => {
       html: htmlBody,
       reply_to: FROM_EMAIL,
     };
-    if (useBcc) payload.bcc = [bccEmail];
+    if (bccList.length > 0) payload.bcc = bccList;
 
     // Process attachments: download from signed URL → base64 → Resend attachment
     const attachmentMeta: { filename: string; url: string; size?: number; content_type?: string }[] = [];
