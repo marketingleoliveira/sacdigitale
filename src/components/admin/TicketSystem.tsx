@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, MessageSquare, User } from 'lucide-react';
 import { Trash2 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +44,7 @@ interface TicketSystemProps {
 }
 
 export default function TicketSystem({ sacRequestId, currentUserId, currentUserEmail, currentUserDisplayName, canDelete = false }: TicketSystemProps) {
+  const { isVendas } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
@@ -219,6 +221,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
       </ScrollArea>
 
       {/* New Message Input */}
+      {!isVendas && (
       <div className="space-y-2">
         <Label htmlFor="new-ticket-message" className="text-sm text-muted-foreground">
           Nova anotação interna
@@ -251,6 +254,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }
