@@ -97,7 +97,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function AdminDashboard() {
-  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, isVendas, signOut } = useAuth();
+  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, canAccessExternal, isVendas, displayName, signOut } = useAuth();
   const { showWarning, remainingSeconds, dismissWarning, logout } = useInactivityLogout({
     timeoutMinutes: 10,
     warningMinutes: 5,
@@ -459,6 +459,18 @@ export default function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        <div className="flex items-center justify-end gap-2 mb-3">
+          <EyeOff className="h-4 w-4 text-muted-foreground" />
+          <Label htmlFor="view-mode" className="text-sm text-muted-foreground cursor-pointer">
+            Modo Visualização
+          </Label>
+          <Switch
+            id="view-mode"
+            checked={readOnly}
+            disabled={isVendas}
+            onCheckedChange={(v) => setViewMode(v)}
+          />
+        </div>
         <Tabs defaultValue={isVendas ? 'requests' : 'summary'} className="space-y-6">
           <TabsList>
             {!isVendas && (
@@ -747,7 +759,7 @@ export default function AdminDashboard() {
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
-                                  {canDelete && (
+                                  {canDelete && !readOnly && (
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
@@ -859,8 +871,9 @@ export default function AdminDashboard() {
                         onChange={(e) => setInvoiceDraft(e.target.value)}
                         placeholder="Digite a Nota Fiscal"
                         maxLength={100}
-                        disabled={isUpdatingInvoice}
+                        disabled={isUpdatingInvoice || readOnly}
                       />
+                      {!readOnly && (
                       <Button
                         onClick={() => updateRequestInvoice(selectedRequest.id, invoiceDraft)}
                         disabled={isUpdatingInvoice || invoiceDraft.trim() === (selectedRequest.order_number || '')}
@@ -868,6 +881,7 @@ export default function AdminDashboard() {
                       >
                         {isUpdatingInvoice ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
                       </Button>
+                      )}
                     </div>
                   </div>
                   {selectedRequest.contact_type === 'reclamacao' && (selectedRequest as any).complaint_type && (
@@ -885,7 +899,7 @@ export default function AdminDashboard() {
                       <Select
                         value={selectedRequest.status}
                         onValueChange={(value) => updateRequestStatus(selectedRequest.id, value)}
-                        disabled={isUpdatingStatus}
+                        disabled={isUpdatingStatus || readOnly}
                       >
                         <SelectTrigger className="w-[180px]">
                           <SelectValue />
@@ -921,7 +935,7 @@ export default function AdminDashboard() {
                         <Select
                           value={selectedRequest.procedencia || ''}
                           onValueChange={(value) => updateRequestProcedencia(selectedRequest.id, value)}
-                          disabled={isUpdatingProcedencia}
+                          disabled={isUpdatingProcedencia || readOnly}
                         >
                           <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Selecionar..." />
@@ -952,7 +966,7 @@ export default function AdminDashboard() {
                         <Select
                           value={(selectedRequest as any).complaint_type || ''}
                           onValueChange={(value) => updateRequestComplaintType(selectedRequest.id, value)}
-                          disabled={isUpdatingComplaintType}
+                          disabled={isUpdatingComplaintType || readOnly}
                         >
                           <SelectTrigger className="w-[220px]">
                             <SelectValue placeholder="Selecionar..." />
@@ -1078,16 +1092,20 @@ export default function AdminDashboard() {
                   <Tabs defaultValue="tickets">
                     <TabsList>
                       <TabsTrigger value="tickets">Tickets Internos</TabsTrigger>
+                      {canAccessExternal && (
                       <TabsTrigger value="emails">Comunicação Externa</TabsTrigger>
+                      )}
                     </TabsList>
                     <TabsContent value="tickets" className="mt-4">
                       <TicketSystem
                         sacRequestId={selectedRequest.id}
                         currentUserId={user.id}
                         currentUserEmail={user.email}
-                        canDelete={canDelete}
+                        currentUserDisplayName={displayName}
+                        canDelete={canDelete && !readOnly}
                       />
                     </TabsContent>
+                    {canAccessExternal && (
                     <TabsContent value="emails" className="mt-4">
                       <ExternalCommunication
                         sacRequestId={selectedRequest.id}
@@ -1095,6 +1113,7 @@ export default function AdminDashboard() {
                         protocol={selectedRequest.protocol}
                       />
                     </TabsContent>
+                    )}
                   </Tabs>
                 </div>
               </div>
