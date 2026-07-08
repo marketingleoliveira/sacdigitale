@@ -33,10 +33,14 @@ const Index = () => {
               Contato
             </a>
           </div>
-          <div className="mt-6">
-            <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+          <div className="mt-6 flex justify-center">
+            <Button
+              asChild
+              size="lg"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all duration-200 font-semibold px-8 py-6 rounded-xl border-2 border-primary/20 hover:-translate-y-0.5"
+            >
               <Link to="/admin/login">
-                <Lock className="h-3 w-3 mr-2" />
+                <Lock className="h-4 w-4 mr-2" />
                 Área Administrativa
               </Link>
             </Button>
