@@ -2,7 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-export type AppRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia' | 'user';
+export type AppRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia' | 'vendas' | 'user';
 
 interface AuthContextType {
   user: User | null;
@@ -10,9 +10,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   role: AppRole | null;
+  displayName: string | null;
   isSuperAdmin: boolean;
   canManageUsers: boolean;
   canDelete: boolean;
+  canAccessExternal: boolean;
+  isVendas: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -25,25 +28,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
-  const fetchUserRole = async (userId: string): Promise<AppRole | null> => {
+  const fetchUserRole = async (userId: string): Promise<{ role: AppRole | null; displayName: string | null }> => {
     try {
       const { data, error } = await supabase
         .from('user_roles')
-        .select('role')
+        .select('role, display_name')
         .eq('user_id', userId)
-        .in('role', ['admin', 'desenvolvedor', 'qualidade', 'gerencia'])
+        .in('role', ['admin', 'desenvolvedor', 'qualidade', 'gerencia', 'vendas'])
         .maybeSingle();
 
       if (error) {
         console.error('Error checking role:', error);
-        return null;
+        return { role: null, displayName: null };
       }
 
-      return (data?.role as AppRole) ?? null;
+      return {
+        role: (data?.role as AppRole) ?? null,
+        displayName: (data as { display_name?: string | null } | null)?.display_name ?? null,
+      };
     } catch (error) {
       console.error('Error checking role:', error);
-      return null;
+      return { role: null, displayName: null };
     }
   };
 
@@ -56,11 +63,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(async () => {
             const r = await fetchUserRole(session.user.id);
-            setRole(r);
+            setRole(r.role);
+            setDisplayName(r.displayName);
             setIsLoading(false);
           }, 0);
         } else {
           setRole(null);
+          setDisplayName(null);
           setIsLoading(false);
         }
       }
@@ -72,7 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (session?.user) {
         fetchUserRole(session.user.id).then((r) => {
-          setRole(r);
+          setRole(r.role);
+          setDisplayName(r.displayName);
           setIsLoading(false);
         });
       } else {
@@ -102,15 +112,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setRole(null);
+    setDisplayName(null);
   };
 
   const isAdmin = role !== null;
   const isSuperAdmin = role === 'admin' || role === 'desenvolvedor';
   const canManageUsers = isSuperAdmin || role === 'gerencia';
   const canDelete = isSuperAdmin;
+  const isVendas = role === 'vendas';
+  const canAccessExternal = isAdmin && !isVendas;
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, isAdmin, role, isSuperAdmin, canManageUsers, canDelete, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading, isAdmin, role, displayName, isSuperAdmin, canManageUsers, canDelete, canAccessExternal, isVendas, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

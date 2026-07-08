@@ -31,25 +31,28 @@ interface Ticket {
   created_at: string;
   updated_at: string;
   author_email: string | null;
+  author_name: string | null;
 }
 
 interface TicketSystemProps {
   sacRequestId: string;
   currentUserId: string;
   currentUserEmail?: string;
+  currentUserDisplayName?: string | null;
   canDelete?: boolean;
 }
 
-export default function TicketSystem({ sacRequestId, currentUserId, currentUserEmail, canDelete = false }: TicketSystemProps) {
+export default function TicketSystem({ sacRequestId, currentUserId, currentUserEmail, currentUserDisplayName, canDelete = false }: TicketSystemProps) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const getEmailPrefix = (email: string | null): string => {
-    if (!email) return 'Admin';
-    const prefix = email.split('@')[0];
+  const getAuthorLabel = (ticket: Ticket): string => {
+    if (ticket.author_name && ticket.author_name.trim()) return ticket.author_name.trim();
+    if (!ticket.author_email) return 'Admin';
+    const prefix = ticket.author_email.split('@')[0];
     return prefix.charAt(0).toUpperCase() + prefix.slice(1);
   };
 
@@ -87,6 +90,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
         message: newMessage.trim(),
         is_internal: true,
         author_email: currentUserEmail || null,
+        author_name: currentUserDisplayName || null,
       });
 
       if (error) throw error;
@@ -163,7 +167,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant="outline" className="text-xs">
-                          {getEmailPrefix(ticket.author_email)}
+                          {getAuthorLabel(ticket)}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           {formatDate(ticket.created_at)}

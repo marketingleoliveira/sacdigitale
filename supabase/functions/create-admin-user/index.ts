@@ -10,6 +10,7 @@ interface CreateAdminRequest {
   email: string;
   password: string;
   role?: string;
+  display_name?: string;
 }
 
 serve(async (req) => {
@@ -58,9 +59,16 @@ serve(async (req) => {
       );
     }
 
-    const { email, password, role: requestedRole }: CreateAdminRequest = await req.json();
-    const allowedRoles = ["desenvolvedor", "qualidade", "gerencia"];
+    const { email, password, role: requestedRole, display_name }: CreateAdminRequest = await req.json();
+    const allowedRoles = ["desenvolvedor", "qualidade", "gerencia", "vendas"];
     const newRole = allowedRoles.includes(requestedRole ?? "") ? requestedRole! : "desenvolvedor";
+
+    if (newRole === "vendas" && (!display_name || !display_name.trim())) {
+      return new Response(
+        JSON.stringify({ error: "Nome do vendedor é obrigatório" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!email || !password) {
       return new Response(
@@ -100,7 +108,11 @@ serve(async (req) => {
     // Add admin role
     const { error: roleInsertError } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: newUser.user.id, role: newRole });
+      .insert({
+        user_id: newUser.user.id,
+        role: newRole,
+        display_name: display_name?.trim() || null,
+      });
 
     if (roleInsertError) {
       // Rollback: delete the created user
