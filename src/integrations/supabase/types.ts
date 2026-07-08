@@ -264,6 +264,7 @@ export type Database = {
     }
     Functions: {
       can_manage_users: { Args: { _user_id: string }; Returns: boolean }
+      has_external_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
