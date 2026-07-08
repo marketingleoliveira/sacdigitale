@@ -34,10 +34,16 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    
-    if (authError || !requestingUser) {
+    const token = authHeader.replace("Bearer ", "").trim();
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: claimsData, error: authError } = await authClient.auth.getClaims(token);
+    const requestingUserId = claimsData?.claims?.sub as string | undefined;
+
+    if (authError || !requestingUserId) {
       return new Response(
         JSON.stringify({ error: "Token inválido" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -48,7 +54,7 @@ serve(async (req) => {
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", requestingUser.id)
+      .eq("user_id", requestingUserId)
       .in("role", ["admin", "desenvolvedor", "gerencia"])
       .maybeSingle();
 
