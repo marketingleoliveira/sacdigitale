@@ -12,6 +12,8 @@ interface EmailSettings {
   id: string;
   bcc_enabled: boolean;
   bcc_email: string;
+  emails_enabled: boolean;
+  self_copy_enabled: boolean;
 }
 
 export default function ExternalSettings() {
@@ -23,7 +25,7 @@ export default function ExternalSettings() {
     setLoading(true);
     const { data, error } = await supabase
       .from('email_settings')
-      .select('id, bcc_enabled, bcc_email')
+      .select('id, bcc_enabled, bcc_email, emails_enabled, self_copy_enabled')
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
@@ -46,6 +48,8 @@ export default function ExternalSettings() {
       .update({
         bcc_enabled: settings.bcc_enabled,
         bcc_email: settings.bcc_email.trim(),
+        emails_enabled: settings.emails_enabled,
+        self_copy_enabled: settings.self_copy_enabled,
       })
       .eq('id', settings.id);
     setSaving(false);
@@ -70,6 +74,37 @@ export default function ExternalSettings() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      <Card className={settings.emails_enabled ? 'border-primary/30' : 'border-destructive/50'}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-primary" />
+            Status do envio de e-mails
+          </CardTitle>
+          <CardDescription>
+            Liga/desliga globalmente todo o envio pela Comunicação Externa.
+            Use OFF em caso de manutenção ou instabilidade do provedor.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <Label className="text-base">
+                {settings.emails_enabled ? '🟢 Sistema ONLINE' : '🔴 Sistema OFFLINE'}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                {settings.emails_enabled
+                  ? 'E-mails serão enviados normalmente aos clientes.'
+                  : 'Nenhum e-mail será enviado enquanto estiver desativado.'}
+              </p>
+            </div>
+            <Switch
+              checked={settings.emails_enabled}
+              onCheckedChange={(v) => setSettings({ ...settings, emails_enabled: v })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -84,7 +119,21 @@ export default function ExternalSettings() {
         <CardContent className="space-y-5">
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
-              <Label className="text-base">Ativar BCC automático</Label>
+              <Label className="text-base">Recibo no remetente (qualidade@)</Label>
+              <p className="text-sm text-muted-foreground">
+                Envia uma cópia oculta para o próprio <strong>qualidade@digitaletextil.com.br</strong>,
+                servindo como comprovante do envio na caixa de entrada.
+              </p>
+            </div>
+            <Switch
+              checked={settings.self_copy_enabled}
+              onCheckedChange={(v) => setSettings({ ...settings, self_copy_enabled: v })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <Label className="text-base">BCC para o gerente</Label>
               <p className="text-sm text-muted-foreground">
                 Inclui o endereço abaixo em todos os e-mails de saída.
               </p>

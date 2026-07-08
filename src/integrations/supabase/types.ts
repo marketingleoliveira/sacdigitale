@@ -111,7 +111,9 @@ export type Database = {
           bcc_email: string
           bcc_enabled: boolean
           created_at: string
+          emails_enabled: boolean
           id: string
+          self_copy_enabled: boolean
           updated_at: string
           updated_by: string | null
         }
@@ -119,7 +121,9 @@ export type Database = {
           bcc_email?: string
           bcc_enabled?: boolean
           created_at?: string
+          emails_enabled?: boolean
           id?: string
+          self_copy_enabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -127,7 +131,9 @@ export type Database = {
           bcc_email?: string
           bcc_enabled?: boolean
           created_at?: string
+          emails_enabled?: boolean
           id?: string
+          self_copy_enabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
