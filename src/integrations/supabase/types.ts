@@ -191,6 +191,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           author_email: string | null
+          author_name: string | null
           created_at: string
           created_by: string
           id: string
@@ -202,6 +203,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           author_email?: string | null
+          author_name?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -213,6 +215,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           author_email?: string | null
+          author_name?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -234,18 +237,21 @@ export type Database = {
       user_roles: {
         Row: {
           created_at: string
+          display_name: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           created_at?: string
+          display_name?: string | null
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           created_at?: string
+          display_name?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
@@ -269,7 +275,13 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "user" | "desenvolvedor" | "qualidade" | "gerencia"
+      app_role:
+        | "admin"
+        | "user"
+        | "desenvolvedor"
+        | "qualidade"
+        | "gerencia"
+        | "vendas"
       contact_type: "reclamacao" | "sugestao" | "elogio" | "duvida"
     }
     CompositeTypes: {
@@ -398,7 +410,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "desenvolvedor", "qualidade", "gerencia"],
+      app_role: [
+        "admin",
+        "user",
+        "desenvolvedor",
+        "qualidade",
+        "gerencia",
+        "vendas",
+      ],
       contact_type: ["reclamacao", "sugestao", "elogio", "duvida"],
     },
   },
