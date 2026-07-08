@@ -90,6 +90,39 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("SAC request saved:", sacData);
 
+    // Send confirmation email to the customer (and copy to qualidade@)
+    try {
+      const resendKey = Deno.env.get("RESEND_API_KEY");
+      if (resendKey) {
+        const FROM = "SAC Digitale <qualidade@digitaletextil.com.br>";
+        const html = `
+          <div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6">
+            <p>Olá <strong>${requestData.name}</strong>,</p>
+            <p>Recebemos sua solicitação e ela <strong>está sendo analisada</strong> pela nossa equipe de qualidade.
+            Responderemos em breve pelo mesmo canal.</p>
+            <p><strong>Protocolo:</strong> ${protocol}<br>
+            <strong>Assunto:</strong> ${requestData.subject}</p>
+            <hr>
+            <div style="font-size:11px;color:#888">Digitale Têxtil — SAC Qualidade</div>
+          </div>`;
+        const r = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: FROM,
+            to: [requestData.email],
+            bcc: ["qualidade@digitaletextil.com.br"],
+            reply_to: FROM,
+            subject: `[${protocol}] Recebemos sua solicitação — em análise`,
+            html,
+          }),
+        });
+        if (!r.ok) console.error("submit-sac confirmation email failed:", await r.text());
+      }
+    } catch (e) {
+      console.error("submit-sac confirmation email error:", e);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
