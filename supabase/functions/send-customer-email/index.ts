@@ -165,6 +165,37 @@ serve(async (req) => {
       attachments: attachmentMeta,
     });
 
+    // Explicit "recibo" (receipt) email back to qualidade@ confirming delivery to the customer.
+    try {
+      const receiptHtml = `
+        <div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6">
+          <p>✅ <strong>Mensagem enviada com êxito</strong></p>
+          <p><strong>Protocolo:</strong> ${protocol}<br>
+          <strong>Para:</strong> ${to}<br>
+          <strong>Assunto:</strong> ${finalSubject}<br>
+          <strong>Enviado por:</strong> ${user.email}<br>
+          <strong>Resend ID:</strong> ${resendData.id}</p>
+          <hr>
+          <div style="font-size:12px;color:#555;white-space:pre-wrap">${
+            String(body).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]!))
+          }</div>
+          <hr>
+          <div style="font-size:11px;color:#888">Recibo automático — Digitale Têxtil</div>
+        </div>`;
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: ["qualidade@digitaletextil.com.br"],
+          subject: `✅ Recibo [${protocol}] mensagem enviada para ${to}`,
+          html: receiptHtml,
+        }),
+      });
+    } catch (e) {
+      console.error("[send-customer-email] falha ao enviar recibo:", e);
+    }
+
     return new Response(JSON.stringify({ success: true, id: resendData.id }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
