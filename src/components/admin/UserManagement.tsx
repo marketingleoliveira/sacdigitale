@@ -42,7 +42,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
-type StaffRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia';
+type StaffRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia' | 'vendas';
 
 interface AdminUser {
   id: string;
@@ -50,6 +50,7 @@ interface AdminUser {
   role: StaffRole | 'user';
   created_at: string;
   email?: string | null;
+  display_name?: string | null;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -57,6 +58,7 @@ const ROLE_LABELS: Record<string, string> = {
   desenvolvedor: 'Desenvolvedor',
   qualidade: 'Qualidade',
   gerencia: 'Gerência',
+  vendas: 'Vendas',
 };
 
 const ROLE_STYLES: Record<string, string> = {
@@ -64,6 +66,7 @@ const ROLE_STYLES: Record<string, string> = {
   desenvolvedor: 'bg-purple-100 text-purple-700 border-purple-200',
   qualidade: 'bg-blue-100 text-blue-700 border-blue-200',
   gerencia: 'bg-amber-100 text-amber-700 border-amber-200',
+  vendas: 'bg-emerald-100 text-emerald-700 border-emerald-200',
 };
 
 const emailSchema = z.string().email('E-mail inválido').max(255, 'E-mail muito longo');
@@ -93,6 +96,7 @@ export default function UserManagement() {
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<StaffRole>('qualidade');
+  const [newDisplayName, setNewDisplayName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -124,7 +128,7 @@ export default function UserManagement() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao listar');
       const staff = (result.users as AdminUser[]).filter((u) =>
-        ['admin', 'desenvolvedor', 'qualidade', 'gerencia'].includes(u.role)
+        ['admin', 'desenvolvedor', 'qualidade', 'gerencia', 'vendas'].includes(u.role)
       );
       setAdminUsers(staff);
     } catch (error) {
@@ -157,6 +161,15 @@ export default function UserManagement() {
       return;
     }
 
+    if (newRole === 'vendas' && !newDisplayName.trim()) {
+      toast({
+        title: 'Erro',
+        description: 'Informe o nome do vendedor.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const token = await getFreshAccessToken();
@@ -170,7 +183,12 @@ export default function UserManagement() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({ email: newEmail, password: newPassword, role: newRole }),
+          body: JSON.stringify({
+            email: newEmail,
+            password: newPassword,
+            role: newRole,
+            display_name: newDisplayName.trim() || null,
+          }),
         }
       );
 
@@ -188,6 +206,7 @@ export default function UserManagement() {
       setNewEmail('');
       setNewPassword('');
       setNewRole('qualidade');
+      setNewDisplayName('');
       setIsAddDialogOpen(false);
       fetchAdminUsers();
     } catch (error) {
@@ -287,6 +306,14 @@ export default function UserManagement() {
 
   const handleChangeRole = async (admin: AdminUser, newRoleValue: StaffRole) => {
     if (admin.role === newRoleValue) return;
+    if (newRoleValue === 'vendas' && !admin.display_name?.trim()) {
+      const name = window.prompt('Informe o nome do vendedor:');
+      if (!name || !name.trim()) {
+        toast({ title: 'Cancelado', description: 'Nome é obrigatório para Vendas.' });
+        return;
+      }
+      admin = { ...admin, display_name: name.trim() };
+    }
     setUpdatingRoleFor(admin.user_id);
     try {
       const token = await getFreshAccessToken();
@@ -302,6 +329,7 @@ export default function UserManagement() {
             action: 'update_role',
             user_id: admin.user_id,
             role: newRoleValue,
+            display_name: admin.display_name ?? null,
           }),
         }
       );
@@ -358,6 +386,7 @@ export default function UserManagement() {
               <TableHeader>
                 <TableRow>
                   <TableHead>E-mail</TableHead>
+                  <TableHead>Nome</TableHead>
                   <TableHead>Cargo</TableHead>
                   <TableHead>Data de Criação</TableHead>
                   <TableHead className="w-[120px]">Ações</TableHead>
@@ -372,6 +401,9 @@ export default function UserManagement() {
                           {admin.user_id.slice(0, 8)}...
                         </span>
                       )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {admin.display_name || '—'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -392,6 +424,7 @@ export default function UserManagement() {
                             <SelectItem value="desenvolvedor">Desenvolvedor</SelectItem>
                             <SelectItem value="qualidade">Qualidade</SelectItem>
                             <SelectItem value="gerencia">Gerência</SelectItem>
+                            <SelectItem value="vendas">Vendas</SelectItem>
                           </SelectContent>
                         </Select>
                         {updatingRoleFor === admin.user_id && (
@@ -487,8 +520,23 @@ export default function UserManagement() {
                   <SelectItem value="desenvolvedor">Desenvolvedor — acesso total</SelectItem>
                   <SelectItem value="qualidade">Qualidade — sem excluir e sem usuários</SelectItem>
                   <SelectItem value="gerencia">Gerência — sem excluir, com usuários</SelectItem>
+                  <SelectItem value="vendas">Vendas — apenas solicitações e tickets internos</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="display-name">
+                Nome {newRole === 'vendas' && <span className="text-destructive">*</span>}
+              </Label>
+              <Input
+                id="display-name"
+                placeholder={newRole === 'vendas' ? 'Ex.: João Vendedor' : 'Opcional'}
+                value={newDisplayName}
+                onChange={(e) => setNewDisplayName(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Aparece nos tickets internos para identificar quem escreveu.
+              </p>
             </div>
           </div>
 

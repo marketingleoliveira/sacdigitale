@@ -140,11 +140,17 @@ serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const { user_id, role } = body as { user_id: string; role: string };
-      const allowed = ["desenvolvedor", "qualidade", "gerencia"];
+      const { user_id, role, display_name } = body as { user_id: string; role: string; display_name?: string };
+      const allowed = ["desenvolvedor", "qualidade", "gerencia", "vendas"];
       if (!user_id || !allowed.includes(role)) {
         return new Response(
           JSON.stringify({ error: "Cargo inválido" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (role === "vendas" && (!display_name || !display_name.trim())) {
+        return new Response(
+          JSON.stringify({ error: "Nome do vendedor é obrigatório" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -153,12 +159,31 @@ serve(async (req) => {
         .from("user_roles")
         .delete()
         .eq("user_id", user_id)
-        .in("role", ["admin", "desenvolvedor", "qualidade", "gerencia"]);
+        .in("role", ["admin", "desenvolvedor", "qualidade", "gerencia", "vendas"]);
       if (delErr) throw delErr;
       const { error: insErr } = await supabaseAdmin
         .from("user_roles")
-        .insert({ user_id, role });
+        .insert({ user_id, role, display_name: display_name?.trim() || null });
       if (insErr) throw insErr;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "update_display_name") {
+      if (!canManageUsers) {
+        return new Response(
+          JSON.stringify({ error: "Sem permissão" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { user_id, display_name } = body as { user_id: string; display_name: string | null };
+      const { error: updErr } = await supabaseAdmin
+        .from("user_roles")
+        .update({ display_name: display_name?.trim() || null })
+        .eq("user_id", user_id);
+      if (updErr) throw updErr;
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

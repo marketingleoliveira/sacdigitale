@@ -66,6 +66,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { LayoutDashboard, Mail } from 'lucide-react';
+import { EyeOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import UserManagement from '@/components/admin/UserManagement';
 import TicketSystem from '@/components/admin/TicketSystem';
 import ExternalCommunication from '@/components/admin/ExternalCommunication';
@@ -95,7 +97,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function AdminDashboard() {
-  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, signOut } = useAuth();
+  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, canAccessExternal, isVendas, displayName, signOut } = useAuth();
   const { showWarning, remainingSeconds, dismissWarning, logout } = useInactivityLogout({
     timeoutMinutes: 10,
     warningMinutes: 5,
@@ -112,6 +114,8 @@ export default function AdminDashboard() {
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
+  const [viewMode, setViewMode] = useState<boolean>(false);
+  const readOnly = isVendas || viewMode;
 
   useEffect(() => {
     setInvoiceDraft(selectedRequest?.order_number || '');
@@ -455,31 +459,49 @@ export default function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="summary" className="space-y-6">
+        <div className="flex items-center justify-end gap-2 mb-3">
+          <EyeOff className="h-4 w-4 text-muted-foreground" />
+          <Label htmlFor="view-mode" className="text-sm text-muted-foreground cursor-pointer">
+            Modo Visualização
+          </Label>
+          <Switch
+            id="view-mode"
+            checked={readOnly}
+            disabled={isVendas}
+            onCheckedChange={(v) => setViewMode(v)}
+          />
+        </div>
+        <Tabs defaultValue={isVendas ? 'requests' : 'summary'} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="summary" className="gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Resumo
-            </TabsTrigger>
+            {!isVendas && (
+              <TabsTrigger value="summary" className="gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                Resumo
+              </TabsTrigger>
+            )}
             <TabsTrigger value="requests" className="gap-2">
               <Inbox className="h-4 w-4" />
               Solicitações
             </TabsTrigger>
-            {canManageUsers && (
+            {canManageUsers && !isVendas && (
               <TabsTrigger value="users" className="gap-2">
                 <Users className="h-4 w-4" />
                 Usuários
               </TabsTrigger>
             )}
-            <TabsTrigger value="reports" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Relatórios
-            </TabsTrigger>
-            <TabsTrigger value="complaint-types" className="gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Tipos de Reclamação
-            </TabsTrigger>
-            {canManageUsers && (
+            {!isVendas && (
+              <TabsTrigger value="reports" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Relatórios
+              </TabsTrigger>
+            )}
+            {!isVendas && (
+              <TabsTrigger value="complaint-types" className="gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Tipos de Reclamação
+              </TabsTrigger>
+            )}
+            {canManageUsers && !isVendas && (
               <TabsTrigger value="external-settings" className="gap-2">
                 <Mail className="h-4 w-4" />
                 Configurações Externas
@@ -487,9 +509,11 @@ export default function AdminDashboard() {
             )}
           </TabsList>
 
-          <TabsContent value="summary">
-            <MonthSummary />
-          </TabsContent>
+          {!isVendas && (
+            <TabsContent value="summary">
+              <MonthSummary />
+            </TabsContent>
+          )}
 
           <TabsContent value="requests" className="space-y-6">
             {/* Stats */}
@@ -735,7 +759,7 @@ export default function AdminDashboard() {
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
-                                  {canDelete && (
+                                  {canDelete && !readOnly && (
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
@@ -775,21 +799,25 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {canManageUsers && (
+          {canManageUsers && !isVendas && (
             <TabsContent value="users">
               <UserManagement />
             </TabsContent>
           )}
 
-          <TabsContent value="reports">
-            <MonthlyReports />
-          </TabsContent>
+          {!isVendas && (
+            <TabsContent value="reports">
+              <MonthlyReports />
+            </TabsContent>
+          )}
 
-          <TabsContent value="complaint-types">
-            <ComplaintTypesManagement />
-          </TabsContent>
+          {!isVendas && (
+            <TabsContent value="complaint-types">
+              <ComplaintTypesManagement />
+            </TabsContent>
+          )}
 
-          {canManageUsers && (
+          {canManageUsers && !isVendas && (
             <TabsContent value="external-settings">
               <ExternalSettings />
             </TabsContent>
@@ -843,8 +871,9 @@ export default function AdminDashboard() {
                         onChange={(e) => setInvoiceDraft(e.target.value)}
                         placeholder="Digite a Nota Fiscal"
                         maxLength={100}
-                        disabled={isUpdatingInvoice}
+                        disabled={isUpdatingInvoice || readOnly}
                       />
+                      {!readOnly && (
                       <Button
                         onClick={() => updateRequestInvoice(selectedRequest.id, invoiceDraft)}
                         disabled={isUpdatingInvoice || invoiceDraft.trim() === (selectedRequest.order_number || '')}
@@ -852,6 +881,7 @@ export default function AdminDashboard() {
                       >
                         {isUpdatingInvoice ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
                       </Button>
+                      )}
                     </div>
                   </div>
                   {selectedRequest.contact_type === 'reclamacao' && (selectedRequest as any).complaint_type && (
@@ -869,7 +899,7 @@ export default function AdminDashboard() {
                       <Select
                         value={selectedRequest.status}
                         onValueChange={(value) => updateRequestStatus(selectedRequest.id, value)}
-                        disabled={isUpdatingStatus}
+                        disabled={isUpdatingStatus || readOnly}
                       >
                         <SelectTrigger className="w-[180px]">
                           <SelectValue />
@@ -905,7 +935,7 @@ export default function AdminDashboard() {
                         <Select
                           value={selectedRequest.procedencia || ''}
                           onValueChange={(value) => updateRequestProcedencia(selectedRequest.id, value)}
-                          disabled={isUpdatingProcedencia}
+                          disabled={isUpdatingProcedencia || readOnly}
                         >
                           <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Selecionar..." />
@@ -936,7 +966,7 @@ export default function AdminDashboard() {
                         <Select
                           value={(selectedRequest as any).complaint_type || ''}
                           onValueChange={(value) => updateRequestComplaintType(selectedRequest.id, value)}
-                          disabled={isUpdatingComplaintType}
+                          disabled={isUpdatingComplaintType || readOnly}
                         >
                           <SelectTrigger className="w-[220px]">
                             <SelectValue placeholder="Selecionar..." />
@@ -1062,16 +1092,20 @@ export default function AdminDashboard() {
                   <Tabs defaultValue="tickets">
                     <TabsList>
                       <TabsTrigger value="tickets">Tickets Internos</TabsTrigger>
+                      {canAccessExternal && (
                       <TabsTrigger value="emails">Comunicação Externa</TabsTrigger>
+                      )}
                     </TabsList>
                     <TabsContent value="tickets" className="mt-4">
                       <TicketSystem
                         sacRequestId={selectedRequest.id}
                         currentUserId={user.id}
                         currentUserEmail={user.email}
-                        canDelete={canDelete}
+                        currentUserDisplayName={displayName}
+                        canDelete={canDelete && !readOnly}
                       />
                     </TabsContent>
+                    {canAccessExternal && (
                     <TabsContent value="emails" className="mt-4">
                       <ExternalCommunication
                         sacRequestId={selectedRequest.id}
@@ -1079,6 +1113,7 @@ export default function AdminDashboard() {
                         protocol={selectedRequest.protocol}
                       />
                     </TabsContent>
+                    )}
                   </Tabs>
                 </div>
               </div>
