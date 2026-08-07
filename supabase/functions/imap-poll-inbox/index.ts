@@ -447,13 +447,26 @@ Deno.serve(async (req) => {
           if (existing) { await imap.markSeen(uid); skipped++; continue; }
         }
 
-        // Auto-classify direction based on flow:
-        // - If the sender is one of our own outgoing addresses (qualidade/gerente@digitaletextil.com.br),
-        //   this is a copy of a message WE sent → classify as OUTBOUND (Enviado).
-        // - Otherwise it's a real customer reply → INBOUND (Recebido).
-        const OWN_ADDRESSES = ["qualidade@digitaletextil.com.br", "gerente@digitaletextil.com.br"];
+        // 1. Identify "Internal" emails (Digitale to Digitale)
+        const DOMAIN = "digitaletextil.com.br";
         const fromNormalized = (from || "").toLowerCase();
+        const toNormalized = (to || "").toLowerCase();
+        const isFromDigitale = fromNormalized.endsWith(`@${DOMAIN}`);
+        const isToDigitale = toNormalized.endsWith(`@${DOMAIN}`);
+        const isInternal = isFromDigitale && isToDigitale;
+
+        // 2. Identify if it's one of our formal service accounts
+        const OWN_ADDRESSES = ["qualidade@digitaletextil.com.br", "gerente@digitaletextil.com.br"];
         const isOwnSender = OWN_ADDRESSES.some((a) => fromNormalized.includes(a));
+
+        // Ignore internal messages (e.g. comercial to qualidade) unless it involves a protocol
+        if (isInternal && !protocol) {
+          await imap.markSeen(uid);
+          skipped++;
+          continue;
+        }
+
+        // Auto-classify direction based on flow
         const direction: "inbound" | "outbound" = isOwnSender ? "outbound" : "inbound";
 
         const { error: insErr } = await admin.from("email_communications").insert({
@@ -465,7 +478,7 @@ Deno.serve(async (req) => {
           body: text || "(sem conteúdo)",
           status: sacRequestId ? (direction === "outbound" ? "sent" : "received") : "unlinked",
           resend_id: messageId,
-          raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null, auto_classified: direction },
+          raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null, auto_classified: direction, is_internal: isInternal },
         });
         if (insErr) { failed++; errors.push(`uid ${uid}: ${insErr.message}`); continue; }
 
