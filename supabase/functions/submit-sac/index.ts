@@ -115,6 +115,9 @@ const handler = async (req: Request): Promise<Response> => {
             reply_to: FROM,
             subject: confSubject,
             html,
+            headers: {
+              "X-SAC-Auto-Reply": "true"
+            }
           }),
         });
         if (!r.ok) {
@@ -131,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
             body: `Olá ${requestData.name},\n\nRecebemos sua solicitação e ela está sendo analisada pela nossa equipe de qualidade. Responderemos em breve pelo mesmo canal.\n\nProtocolo: ${protocol}\nAssunto: ${requestData.subject}`,
             status: "sent",
             sent_by_email: "sistema@digitaletextil.com.br",
-            raw_payload: { type: "sac.confirmation", source: "submit-sac" },
+            raw_payload: { type: "sac.confirmation", source: "submit-sac", auto_reply: true },
           });
         }
       }
