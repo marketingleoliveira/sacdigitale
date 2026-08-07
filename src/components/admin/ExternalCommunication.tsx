@@ -21,7 +21,7 @@ interface EmailItem {
   sent_by_email: string | null;
   error_message: string | null;
   created_at: string;
-  raw_payload?: { type?: string; source?: string } | null;
+  raw_payload?: { type?: string; source?: string; is_internal?: boolean } | null;
   attachments?: { filename: string; url: string; size?: number; content_type?: string }[];
   sac_request_id: string | null;
   _historical?: boolean;
@@ -61,9 +61,16 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
     if (error) toast.error('Erro ao carregar e-mails');
     const rows = ((data as unknown) as EmailItem[]) || [];
     const seen = new Set<string>();
+    const DOMAIN = 'digitaletextil.com.br';
     const visibleEmails = rows
       .filter((email) => !isTechnicalEmptyEvent(email))
       .filter((email) => {
+        // filter out internal Digitale-to-Digitale communications that aren't linked to this specific SAC
+        const from = (email.from_email || '').toLowerCase();
+        const to = (email.to_email || '').toLowerCase();
+        const isInternal = from.endsWith(`@${DOMAIN}`) && to.endsWith(`@${DOMAIN}`);
+        if (isInternal && email.sac_request_id !== sacRequestId) return false;
+        
         if (seen.has(email.id)) return false;
         seen.add(email.id);
         return true;
