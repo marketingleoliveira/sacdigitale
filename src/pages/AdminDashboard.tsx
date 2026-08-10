@@ -65,7 +65,7 @@ import {
   ExternalLink,
   Trash2,
 } from 'lucide-react';
-import { LayoutDashboard, Mail } from 'lucide-react';
+import { LayoutDashboard, Mail, Shield } from 'lucide-react';
 import { EyeOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 const UserManagement = lazy(() => import('@/components/admin/UserManagement'));
@@ -77,6 +77,7 @@ const MonthlyReports = lazy(() => import('@/components/admin/MonthlyReports'));
 const MonthSummary = lazy(() => import('@/components/admin/MonthSummary'));
 const ComplaintTypesManagement = lazy(() => import('@/components/admin/ComplaintTypesManagement'));
 const ExternalSettings = lazy(() => import('@/components/admin/ExternalSettings'));
+const InternalSettings = lazy(() => import('@/components/admin/InternalSettings'));
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -97,7 +98,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function AdminDashboard() {
-  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, canAccessExternal, isVendas, displayName, signOut } = useAuth();
+  const { user, isLoading: authLoading, isAdmin, role, canManageUsers, canDelete, canAccessExternal, isVendas, displayName, signOut } = useAuth();
   const { showWarning, remainingSeconds, dismissWarning, logout } = useInactivityLogout({
     timeoutMinutes: 10,
     warningMinutes: 5,
@@ -507,6 +508,12 @@ export default function AdminDashboard() {
                 Configurações Externas
               </TabsTrigger>
             )}
+            {role === 'desenvolvedor' && (
+              <TabsTrigger value="internal-settings" className="gap-2">
+                <Shield className="h-4 w-4" />
+                Configurações Internas
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
@@ -823,6 +830,12 @@ export default function AdminDashboard() {
             {canManageUsers && !isVendas && (
               <TabsContent value="external-settings">
                 <ExternalSettings />
+              </TabsContent>
+            )}
+
+            {role === 'desenvolvedor' && (
+              <TabsContent value="internal-settings">
+                <InternalSettings />
               </TabsContent>
             )}
           </Suspense>
