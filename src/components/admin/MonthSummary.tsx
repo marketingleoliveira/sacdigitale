@@ -24,6 +24,7 @@ import {
   Circle,
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
+import { useAuth } from '@/hooks/useAuth';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
 
@@ -109,12 +110,19 @@ const getFreshAccessToken = async () => {
 };
 
 export default function MonthSummary() {
+  const { canManageUsers } = useAuth();
   const [requests, setRequests] = useState<SACRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
   useEffect(() => {
+    if (!canManageUsers) {
+      setStaffUsers([]);
+      setIsLoadingUsers(false);
+      return;
+    }
+
     (async () => {
       setIsLoading(true);
       const { data: reqs } = await supabase
@@ -124,7 +132,7 @@ export default function MonthSummary() {
       setRequests(reqs || []);
       setIsLoading(false);
     })();
-  }, []);
+  }, [canManageUsers]);
 
   useEffect(() => {
     (async () => {
@@ -313,8 +321,8 @@ export default function MonthSummary() {
         </CardContent>
       </Card>
 
-      {/* Contas no sistema */}
-      <Card>
+      {/* Contas no sistema — somente cargos autorizados a listar usuários */}
+      {canManageUsers && <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4" />
@@ -336,7 +344,7 @@ export default function MonthSummary() {
             </>
           )}
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }
