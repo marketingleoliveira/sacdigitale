@@ -68,15 +68,15 @@ import {
 import { LayoutDashboard, Mail } from 'lucide-react';
 import { EyeOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import UserManagement from '@/components/admin/UserManagement';
-import TicketSystem from '@/components/admin/TicketSystem';
-import ExternalCommunication from '@/components/admin/ExternalCommunication';
-import LaudosUpload from '@/components/admin/LaudosUpload';
-import InactivityWarning from '@/components/admin/InactivityWarning';
-import MonthlyReports from '@/components/admin/MonthlyReports';
-import MonthSummary from '@/components/admin/MonthSummary';
-import ComplaintTypesManagement from '@/components/admin/ComplaintTypesManagement';
-import ExternalSettings from '@/components/admin/ExternalSettings';
+const UserManagement = lazy(() => import('@/components/admin/UserManagement'));
+const TicketSystem = lazy(() => import('@/components/admin/TicketSystem'));
+const ExternalCommunication = lazy(() => import('@/components/admin/ExternalCommunication'));
+const LaudosUpload = lazy(() => import('@/components/admin/LaudosUpload'));
+const InactivityWarning = lazy(() => import('@/components/admin/InactivityWarning'));
+const MonthlyReports = lazy(() => import('@/components/admin/MonthlyReports'));
+const MonthSummary = lazy(() => import('@/components/admin/MonthSummary'));
+const ComplaintTypesManagement = lazy(() => import('@/components/admin/ComplaintTypesManagement'));
+const ExternalSettings = lazy(() => import('@/components/admin/ExternalSettings'));
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
