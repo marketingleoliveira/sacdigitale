@@ -86,16 +86,25 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
 
     setIsSending(true);
     try {
-      const { error } = await supabase.from('tickets').insert({
+      const { data: newTicket, error } = await supabase.from('tickets').insert({
         sac_request_id: sacRequestId,
         created_by: currentUserId,
         message: newMessage.trim(),
         is_internal: true,
         author_email: currentUserEmail || null,
         author_name: currentUserDisplayName || null,
-      });
+      }).select().single();
 
       if (error) throw error;
+
+      // Trigger internal notification if enabled
+      try {
+        await supabase.functions.invoke('notify-internal-ticket', {
+          body: { ticket: newTicket }
+        });
+      } catch (notifyError) {
+        console.error('Notification failed:', notifyError);
+      }
 
       setNewMessage('');
       toast.success('Mensagem enviada');
