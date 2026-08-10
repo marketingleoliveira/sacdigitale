@@ -1,0 +1,100 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+
+    if (!resendKey) {
+      throw new Error("RESEND_API_KEY não configurada");
+    }
+
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { ticket } = await req.json();
+    if (!ticket) throw new Error("Ticket data missing");
+
+    // Load settings
+    const { data: settings } = await admin
+      .from("email_settings")
+      .select("internal_notifications_enabled, internal_notification_emails")
+      .limit(1)
+      .maybeSingle();
+
+    if (!settings?.internal_notifications_enabled) {
+      return new Response(JSON.stringify({ success: true, message: "Notifications disabled" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const recipients = settings.internal_notification_emails
+      ?.split(",")
+      .map((e: string) => e.trim())
+      .filter((e: string) => e.includes("@"));
+
+    if (!recipients || recipients.length === 0) {
+      return new Response(JSON.stringify({ error: "No valid recipients" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get SAC request protocol for context
+    const { data: sac } = await admin
+      .from("sac_requests")
+      .select("protocol")
+      .eq("id", ticket.sac_request_id)
+      .maybeSingle();
+
+    const protocol = sac?.protocol ?? "N/A";
+    const author = ticket.author_name || ticket.author_email || "Sistema";
+
+    const subject = `[NOTIFICAÇÃO INTERNA] Nova anotação no SAC ${protocol}`;
+    const htmlBody = `
+      <div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6">
+        <h2 style="color:#0f172a">Nova Anotação Interna</h2>
+        <p>Uma nova comunicação interna foi registrada para o protocolo <strong>${protocol}</strong>.</p>
+        <div style="background-color:#f8fafc;border-left:4px solid #3b82f6;padding:15px;margin:20px 0;">
+          <p style="margin-top:0;font-weight:bold;color:#64748b;font-size:12px">AUTOR: ${author}</p>
+          <div style="white-space:pre-wrap">${ticket.message}</div>
+        </div>
+        <hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0">
+        <p style="font-size:12px;color:#94a3b8">Este é um aviso automático gerado pelo sistema SAC Digitale Têxtil.</p>
+      </div>
+    `;
+
+    const resendResp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "SAC Digitale <qualidade@digitaletextil.com.br>",
+        to: recipients,
+        subject: subject,
+        html: htmlBody,
+      }),
+    });
+
+    const resendData = await resendResp.json();
+    return new Response(JSON.stringify({ success: resendResp.ok, data: resendData }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("notify-internal-ticket error:", err);
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
