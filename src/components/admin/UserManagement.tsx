@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 
 type StaffRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia' | 'vendas';
@@ -104,12 +105,18 @@ export default function UserManagement() {
   const [editPassword, setEditPassword] = useState('');
   const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
   const { toast } = useToast();
+  const { canManageUsers } = useAuth();
 
   useEffect(() => {
+    if (!canManageUsers) {
+      setIsLoading(false);
+      return;
+    }
     fetchAdminUsers();
-  }, []);
+  }, [canManageUsers]);
 
   const fetchAdminUsers = async () => {
+    if (!canManageUsers) return;
     setIsLoading(true);
     try {
       const token = await getFreshAccessToken();
@@ -135,7 +142,7 @@ export default function UserManagement() {
       console.error('Error fetching admin users:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar os administradores.',
+        description: error instanceof Error ? error.message : 'Não foi possível carregar os administradores.',
         variant: 'destructive',
       });
     } finally {
