@@ -1083,11 +1083,13 @@ export default function AdminDashboard() {
                     <Label className="text-muted-foreground text-xs mb-2 block">
                       Laudos de Perícia
                     </Label>
-                    <LaudosUpload
-                      sacRequestId={selectedRequest.id}
-                      existingLaudos={selectedRequest.laudos}
-                      onLaudosChange={(laudos) => updateRequestLaudos(selectedRequest.id, laudos)}
-                    />
+                    <Suspense fallback={<Loader2 className="h-4 w-4 animate-spin text-primary" />}>
+                      <LaudosUpload
+                        sacRequestId={selectedRequest.id}
+                        existingLaudos={selectedRequest.laudos}
+                        onLaudosChange={(laudos) => updateRequestLaudos(selectedRequest.id, laudos)}
+                      />
+                    </Suspense>
                   </div>
                 )}
 
