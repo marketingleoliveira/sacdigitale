@@ -99,6 +99,19 @@ serve(async (req) => {
     });
 
     const resendData = await resendResp.json();
+    
+    // Log the result
+    try {
+      await admin.from("internal_ticket_logs").insert({
+        ticket_id: ticket.id,
+        status: resendResp.ok ? "success" : "failure",
+        recipient_email: recipients.join(", "),
+        error_message: resendResp.ok ? null : (resendData.message || JSON.stringify(resendData))
+      });
+    } catch (logErr) {
+      console.error("Failed to log internal notification:", logErr);
+    }
+
     return new Response(JSON.stringify({ success: resendResp.ok, data: resendData }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
