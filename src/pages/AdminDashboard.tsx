@@ -1103,21 +1103,25 @@ export default function AdminDashboard() {
                       )}
                     </TabsList>
                     <TabsContent value="tickets" className="mt-4">
-                      <TicketSystem
-                        sacRequestId={selectedRequest.id}
-                        currentUserId={user.id}
-                        currentUserEmail={user.email}
-                        currentUserDisplayName={displayName}
-                        canDelete={canDelete && !readOnly}
-                      />
+                      <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />}>
+                        <TicketSystem
+                          sacRequestId={selectedRequest.id}
+                          currentUserId={user.id}
+                          currentUserEmail={user.email}
+                          currentUserDisplayName={displayName}
+                          canDelete={canDelete && !readOnly}
+                        />
+                      </Suspense>
                     </TabsContent>
                     {canAccessExternal && (
                     <TabsContent value="emails" className="mt-4">
-                      <ExternalCommunication
-                        sacRequestId={selectedRequest.id}
-                        recipientEmail={selectedRequest.email}
-                        protocol={selectedRequest.protocol}
-                      />
+                      <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />}>
+                        <ExternalCommunication
+                          sacRequestId={selectedRequest.id}
+                          recipientEmail={selectedRequest.email}
+                          protocol={selectedRequest.protocol}
+                        />
+                      </Suspense>
                     </TabsContent>
                     )}
                   </Tabs>
