@@ -801,29 +801,31 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {canManageUsers && !isVendas && (
-            <TabsContent value="users">
-              <UserManagement />
-            </TabsContent>
-          )}
+          <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            {canManageUsers && !isVendas && (
+              <TabsContent value="users">
+                <UserManagement />
+              </TabsContent>
+            )}
 
-          {!isVendas && (
-            <TabsContent value="reports">
-              <MonthlyReports />
-            </TabsContent>
-          )}
+            {!isVendas && (
+              <TabsContent value="reports">
+                <MonthlyReports />
+              </TabsContent>
+            )}
 
-          {!isVendas && (
-            <TabsContent value="complaint-types">
-              <ComplaintTypesManagement />
-            </TabsContent>
-          )}
+            {!isVendas && (
+              <TabsContent value="complaint-types">
+                <ComplaintTypesManagement />
+              </TabsContent>
+            )}
 
-          {canManageUsers && !isVendas && (
-            <TabsContent value="external-settings">
-              <ExternalSettings />
-            </TabsContent>
-          )}
+            {canManageUsers && !isVendas && (
+              <TabsContent value="external-settings">
+                <ExternalSettings />
+              </TabsContent>
+            )}
+          </Suspense>
         </Tabs>
       </main>
 
