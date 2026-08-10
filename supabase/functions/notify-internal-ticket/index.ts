@@ -49,27 +49,38 @@ serve(async (req) => {
       });
     }
 
-    // Get SAC request protocol for context
+    // Get SAC request context
     const { data: sac } = await admin
       .from("sac_requests")
-      .select("protocol")
+      .select("protocol, company_name, complaint_type, complaint_subtype")
       .eq("id", ticket.sac_request_id)
       .maybeSingle();
 
     const protocol = sac?.protocol ?? "N/A";
+    const companyName = sac?.company_name ?? "Não informada";
+    const complaintType = sac?.complaint_type ?? "Geral";
+    const complaintSubtype = sac?.complaint_subtype ? ` - ${sac.complaint_subtype}` : "";
     const author = ticket.author_name || ticket.author_email || "Sistema";
 
-    const subject = `[NOTIFICAÇÃO INTERNA] Nova anotação no SAC ${protocol}`;
+    const subject = `[NOTIFICAÇÃO INTERNA] SAC ${protocol} - ${companyName}`;
     const htmlBody = `
       <div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6">
         <h2 style="color:#0f172a">Nova Anotação Interna</h2>
-        <p>Uma nova comunicação interna foi registrada para o protocolo <strong>${protocol}</strong>.</p>
+        <p>Uma nova comunicação interna foi registrada para a solicitação:</p>
+        
+        <div style="background-color:#f1f5f9; padding:12px; border-radius:6px; margin-bottom:15px;">
+          <p style="margin:0;"><strong>Empresa:</strong> ${companyName}</p>
+          <p style="margin:0;"><strong>Protocolo:</strong> ${protocol}</p>
+          <p style="margin:0;"><strong>Tipo de Reclamação:</strong> ${complaintType}${complaintSubtype}</p>
+        </div>
+
         <div style="background-color:#f8fafc;border-left:4px solid #3b82f6;padding:15px;margin:20px 0;">
           <p style="margin-top:0;font-weight:bold;color:#64748b;font-size:12px">AUTOR: ${author}</p>
           <div style="white-space:pre-wrap">${ticket.message}</div>
         </div>
+
         <hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0">
-        <p style="font-size:12px;color:#94a3b8">Este é um aviso automático gerado pelo sistema SAC Digitale Têxtil.</p>
+        <p style="font-size:12px;color:#94a3b8">Este é um aviso automático enviado para Diretoria e Gerência via SAC Digitale Têxtil.</p>
       </div>
     `;
 
