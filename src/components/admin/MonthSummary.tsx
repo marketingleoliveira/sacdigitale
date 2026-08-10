@@ -138,6 +138,28 @@ export default function MonthSummary() {
     (async () => {
       setIsLoadingUsers(true);
       try {
+        // Revalidate authorization from the current session before calling the
+        // privileged function. This prevents stale UI permissions after a
+        // session change or hot reload from producing an expected 403.
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentUserId = sessionData.session?.user.id;
+        if (!currentUserId) {
+          setStaffUsers([]);
+          return;
+        }
+
+        const { data: currentRole, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', currentUserId)
+          .in('role', ['admin', 'desenvolvedor', 'gerencia'])
+          .maybeSingle();
+
+        if (roleError || !currentRole) {
+          setStaffUsers([]);
+          return;
+        }
+
         const token = await getFreshAccessToken();
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-admin-users`,

@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const roleRequestId = useRef(0);
 
   const fetchUserRole = async (userId: string): Promise<{ role: AppRole | null; displayName: string | null }> => {
     try {
@@ -57,12 +58,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        const requestId = ++roleRequestId.current;
         setSession(session);
         setUser(session?.user ?? null);
+        // Never retain permissions from a previous session while the new role loads.
+        setRole(null);
+        setDisplayName(null);
         
         if (session?.user) {
           setTimeout(async () => {
             const r = await fetchUserRole(session.user.id);
+            if (requestId !== roleRequestId.current) return;
             setRole(r.role);
             setDisplayName(r.displayName);
             setIsLoading(false);
@@ -76,11 +82,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      const requestId = ++roleRequestId.current;
       setSession(session);
       setUser(session?.user ?? null);
+      setRole(null);
+      setDisplayName(null);
       
       if (session?.user) {
         fetchUserRole(session.user.id).then((r) => {
+          if (requestId !== roleRequestId.current) return;
           setRole(r.role);
           setDisplayName(r.displayName);
           setIsLoading(false);
