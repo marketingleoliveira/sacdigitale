@@ -1,27 +1,9 @@
-import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
+import { useState, useEffect, useContext, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { AuthContext, type AppRole } from './auth-context';
 
-export type AppRole = 'admin' | 'desenvolvedor' | 'qualidade' | 'gerencia' | 'vendas' | 'user';
-
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  isLoading: boolean;
-  isAdmin: boolean;
-  role: AppRole | null;
-  displayName: string | null;
-  isSuperAdmin: boolean;
-  canManageUsers: boolean;
-  canDelete: boolean;
-  canAccessExternal: boolean;
-  isVendas: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export type { AppRole };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
