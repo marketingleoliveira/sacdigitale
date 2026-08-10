@@ -145,6 +145,41 @@ export type Database = {
         }
         Relationships: []
       }
+      internal_ticket_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          recipient_email: string
+          status: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          recipient_email: string
+          status: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          recipient_email?: string
+          status?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_ticket_logs_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sac_requests: {
         Row: {
           attachments: string[] | null
