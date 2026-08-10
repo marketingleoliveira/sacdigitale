@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useInactivityLogout } from '@/hooks/useInactivityLogout';
@@ -68,15 +68,15 @@ import {
 import { LayoutDashboard, Mail } from 'lucide-react';
 import { EyeOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import UserManagement from '@/components/admin/UserManagement';
-import TicketSystem from '@/components/admin/TicketSystem';
-import ExternalCommunication from '@/components/admin/ExternalCommunication';
-import LaudosUpload from '@/components/admin/LaudosUpload';
-import InactivityWarning from '@/components/admin/InactivityWarning';
-import MonthlyReports from '@/components/admin/MonthlyReports';
-import MonthSummary from '@/components/admin/MonthSummary';
-import ComplaintTypesManagement from '@/components/admin/ComplaintTypesManagement';
-import ExternalSettings from '@/components/admin/ExternalSettings';
+const UserManagement = lazy(() => import('@/components/admin/UserManagement'));
+const TicketSystem = lazy(() => import('@/components/admin/TicketSystem'));
+const ExternalCommunication = lazy(() => import('@/components/admin/ExternalCommunication'));
+const LaudosUpload = lazy(() => import('@/components/admin/LaudosUpload'));
+const InactivityWarning = lazy(() => import('@/components/admin/InactivityWarning'));
+const MonthlyReports = lazy(() => import('@/components/admin/MonthlyReports'));
+const MonthSummary = lazy(() => import('@/components/admin/MonthSummary'));
+const ComplaintTypesManagement = lazy(() => import('@/components/admin/ComplaintTypesManagement'));
+const ExternalSettings = lazy(() => import('@/components/admin/ExternalSettings'));
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -509,11 +509,13 @@ export default function AdminDashboard() {
             )}
           </TabsList>
 
-          {!isVendas && (
-            <TabsContent value="summary">
-              <MonthSummary />
-            </TabsContent>
-          )}
+          <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            {!isVendas && (
+              <TabsContent value="summary">
+                <MonthSummary />
+              </TabsContent>
+            )}
+          </Suspense>
 
           <TabsContent value="requests" className="space-y-6">
             {/* Stats */}
@@ -799,29 +801,31 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {canManageUsers && !isVendas && (
-            <TabsContent value="users">
-              <UserManagement />
-            </TabsContent>
-          )}
+          <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            {canManageUsers && !isVendas && (
+              <TabsContent value="users">
+                <UserManagement />
+              </TabsContent>
+            )}
 
-          {!isVendas && (
-            <TabsContent value="reports">
-              <MonthlyReports />
-            </TabsContent>
-          )}
+            {!isVendas && (
+              <TabsContent value="reports">
+                <MonthlyReports />
+              </TabsContent>
+            )}
 
-          {!isVendas && (
-            <TabsContent value="complaint-types">
-              <ComplaintTypesManagement />
-            </TabsContent>
-          )}
+            {!isVendas && (
+              <TabsContent value="complaint-types">
+                <ComplaintTypesManagement />
+              </TabsContent>
+            )}
 
-          {canManageUsers && !isVendas && (
-            <TabsContent value="external-settings">
-              <ExternalSettings />
-            </TabsContent>
-          )}
+            {canManageUsers && !isVendas && (
+              <TabsContent value="external-settings">
+                <ExternalSettings />
+              </TabsContent>
+            )}
+          </Suspense>
         </Tabs>
       </main>
 
@@ -1079,11 +1083,13 @@ export default function AdminDashboard() {
                     <Label className="text-muted-foreground text-xs mb-2 block">
                       Laudos de Perícia
                     </Label>
-                    <LaudosUpload
-                      sacRequestId={selectedRequest.id}
-                      existingLaudos={selectedRequest.laudos}
-                      onLaudosChange={(laudos) => updateRequestLaudos(selectedRequest.id, laudos)}
-                    />
+                    <Suspense fallback={<Loader2 className="h-4 w-4 animate-spin text-primary" />}>
+                      <LaudosUpload
+                        sacRequestId={selectedRequest.id}
+                        existingLaudos={selectedRequest.laudos}
+                        onLaudosChange={(laudos) => updateRequestLaudos(selectedRequest.id, laudos)}
+                      />
+                    </Suspense>
                   </div>
                 )}
 
@@ -1097,21 +1103,25 @@ export default function AdminDashboard() {
                       )}
                     </TabsList>
                     <TabsContent value="tickets" className="mt-4">
-                      <TicketSystem
-                        sacRequestId={selectedRequest.id}
-                        currentUserId={user.id}
-                        currentUserEmail={user.email}
-                        currentUserDisplayName={displayName}
-                        canDelete={canDelete && !readOnly}
-                      />
+                      <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />}>
+                        <TicketSystem
+                          sacRequestId={selectedRequest.id}
+                          currentUserId={user.id}
+                          currentUserEmail={user.email}
+                          currentUserDisplayName={displayName}
+                          canDelete={canDelete && !readOnly}
+                        />
+                      </Suspense>
                     </TabsContent>
                     {canAccessExternal && (
                     <TabsContent value="emails" className="mt-4">
-                      <ExternalCommunication
-                        sacRequestId={selectedRequest.id}
-                        recipientEmail={selectedRequest.email}
-                        protocol={selectedRequest.protocol}
-                      />
+                      <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />}>
+                        <ExternalCommunication
+                          sacRequestId={selectedRequest.id}
+                          recipientEmail={selectedRequest.email}
+                          protocol={selectedRequest.protocol}
+                        />
+                      </Suspense>
                     </TabsContent>
                     )}
                   </Tabs>
@@ -1122,12 +1132,14 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      <InactivityWarning
-        open={showWarning}
-        remainingSeconds={remainingSeconds}
-        onDismiss={dismissWarning}
-        onLogout={logout}
-      />
+      <Suspense fallback={null}>
+        <InactivityWarning
+          open={showWarning}
+          remainingSeconds={remainingSeconds}
+          onDismiss={dismissWarning}
+          onLogout={logout}
+        />
+      </Suspense>
     </div>
   );
 }
