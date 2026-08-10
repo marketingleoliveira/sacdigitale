@@ -6,8 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, MessageSquare, User } from 'lucide-react';
-import { Trash2 } from 'lucide-react';
+import { Loader2, Send, MessageSquare, User, Mail, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import {
   AlertDialog,
@@ -152,10 +151,20 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <MessageSquare className="h-5 w-5 text-primary" />
-        <h3 className="font-semibold">Tickets Internos</h3>
-        <Badge variant="secondary">{tickets.length}</Badge>
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">Tickets Internos</h3>
+          <Badge variant="secondary">{tickets.length}</Badge>
+        </div>
+        <div className="bg-primary/10 border border-primary/20 rounded-md p-2 flex items-start gap-2">
+          <div className="bg-primary/20 p-1 rounded-full mt-0.5">
+            <Mail className="h-3 w-3 text-primary" />
+          </div>
+          <p className="text-[11px] text-primary leading-tight font-medium">
+            AVISO: Ao enviar um novo ticket interno, a Diretoria e a Gerência serão informadas via e-mail.
+          </p>
+        </div>
       </div>
 
       {/* Messages List */}
