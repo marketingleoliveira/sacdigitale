@@ -98,7 +98,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function AdminDashboard() {
-  const { user, isLoading: authLoading, isAdmin, canManageUsers, canDelete, canAccessExternal, isVendas, displayName, signOut } = useAuth();
+  const { user, isLoading: authLoading, isAdmin, role, canManageUsers, canDelete, canAccessExternal, isVendas, displayName, signOut } = useAuth();
   const { showWarning, remainingSeconds, dismissWarning, logout } = useInactivityLogout({
     timeoutMinutes: 10,
     warningMinutes: 5,
