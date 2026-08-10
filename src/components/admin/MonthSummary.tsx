@@ -117,22 +117,22 @@ export default function MonthSummary() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
   useEffect(() => {
-    if (!canManageUsers) {
-      setStaffUsers([]);
-      setIsLoadingUsers(false);
-      return;
-    }
-
     (async () => {
       setIsLoading(true);
-      const { data: reqs } = await supabase
-        .from('sac_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-      setRequests(reqs || []);
-      setIsLoading(false);
+      try {
+        const { data: reqs, error } = await supabase
+          .from('sac_requests')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setRequests(reqs || []);
+      } catch (err) {
+        console.error('Error fetching requests:', err);
+      } finally {
+        setIsLoading(false);
+      }
     })();
-  }, [canManageUsers]);
+  }, []);
 
   useEffect(() => {
     (async () => {
