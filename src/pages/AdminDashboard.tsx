@@ -509,11 +509,13 @@ export default function AdminDashboard() {
             )}
           </TabsList>
 
-          {!isVendas && (
-            <TabsContent value="summary">
-              <MonthSummary />
-            </TabsContent>
-          )}
+          <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            {!isVendas && (
+              <TabsContent value="summary">
+                <MonthSummary />
+              </TabsContent>
+            )}
+          </Suspense>
 
           <TabsContent value="requests" className="space-y-6">
             {/* Stats */}
