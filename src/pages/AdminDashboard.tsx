@@ -1132,12 +1132,14 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      <InactivityWarning
-        open={showWarning}
-        remainingSeconds={remainingSeconds}
-        onDismiss={dismissWarning}
-        onLogout={logout}
-      />
+      <Suspense fallback={null}>
+        <InactivityWarning
+          open={showWarning}
+          remainingSeconds={remainingSeconds}
+          onDismiss={dismissWarning}
+          onLogout={logout}
+        />
+      </Suspense>
     </div>
   );
 }
