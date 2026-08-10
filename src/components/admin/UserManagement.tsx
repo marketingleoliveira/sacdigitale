@@ -364,6 +364,17 @@ export default function UserManagement() {
     });
   };
 
+  if (!canManageUsers) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          <Shield className="h-6 w-6 mx-auto mb-2" />
+          Apenas Desenvolvedor ou Gerência podem gerenciar usuários.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="pb-4">
