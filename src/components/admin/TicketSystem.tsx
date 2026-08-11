@@ -101,17 +101,28 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
       // Fetch full request context to ensure the Edge Function has everything it needs
       const { data: sacData } = await supabase
         .from('sac_requests')
-        .select('protocol, company_name, complaint_type, complaint_subtype')
+        .select('protocol, company_name, name, complaint_type, complaint_subtype')
         .eq('id', sacRequestId)
         .maybeSingle();
 
+      console.log('Context fetched:', sacData);
+
       // Trigger internal notification if enabled
       try {
+        const payload = {
+          ticket: newTicket,
+          sac_request: sacData ? {
+            protocol: sacData.protocol,
+            company_name: sacData.company_name || sacData.name,
+            complaint_type: sacData.complaint_type,
+            complaint_subtype: sacData.complaint_subtype
+          } : null
+        };
+        
+        console.log('Sending notification payload:', payload);
+
         await supabase.functions.invoke('notify-internal-ticket', {
-          body: { 
-            ticket: newTicket,
-            sac_request: sacData // Pass the full data directly to avoid potential Edge Function RLS issues
-          }
+          body: payload
         });
       } catch (notifyError) {
         console.error('Notification failed:', notifyError);

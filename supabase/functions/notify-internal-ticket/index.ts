@@ -53,18 +53,22 @@ serve(async (req) => {
     // Get SAC request context (prefer data passed in payload)
     let sac = sac_request;
     
-    if (!sac) {
-      console.log("SAC request context not provided in payload, fetching from DB...");
+    if (!sac || !sac.protocol || sac.protocol === "N/A" || !sac.company_name) {
+      console.log("SAC request context incomplete in payload, fetching from DB for ID:", ticket.sac_request_id);
       const { data: dbSac, error: sacError } = await admin
         .from("sac_requests")
-        .select("protocol, company_name, complaint_type, complaint_subtype")
+        .select("protocol, company_name, name, complaint_type, complaint_subtype")
         .eq("id", ticket.sac_request_id)
         .maybeSingle();
       
       if (sacError) {
         console.error("Error fetching SAC request:", sacError);
       }
-      sac = dbSac;
+      
+      if (dbSac) {
+        // Merge or replace
+        sac = { ...sac, ...dbSac };
+      }
     }
 
     const protocol = sac?.protocol ?? "N/A";
