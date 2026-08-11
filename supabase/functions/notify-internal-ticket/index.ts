@@ -22,8 +22,9 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { ticket } = await req.json();
+    const { ticket, sac_request } = await req.json();
     if (!ticket) throw new Error("Ticket data missing");
+
 
     // Load settings
     const { data: settings } = await admin

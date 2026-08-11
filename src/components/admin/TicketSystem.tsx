@@ -95,15 +95,28 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
       }).select().single();
 
       if (error) throw error;
+      
+      console.log('Ticket inserted, fetching request data for notification...', sacRequestId);
+      
+      // Fetch full request context to ensure the Edge Function has everything it needs
+      const { data: sacData } = await supabase
+        .from('sac_requests')
+        .select('protocol, company_name, complaint_type, complaint_subtype')
+        .eq('id', sacRequestId)
+        .maybeSingle();
 
       // Trigger internal notification if enabled
       try {
         await supabase.functions.invoke('notify-internal-ticket', {
-          body: { ticket: newTicket }
+          body: { 
+            ticket: newTicket,
+            sac_request: sacData // Pass the full data directly to avoid potential Edge Function RLS issues
+          }
         });
       } catch (notifyError) {
         console.error('Notification failed:', notifyError);
       }
+
 
       setNewMessage('');
       toast.success('Mensagem enviada');
