@@ -50,22 +50,28 @@ serve(async (req) => {
       });
     }
 
-    // Get SAC request context
-    const { data: sac, error: sacError } = await admin
-      .from("sac_requests")
-      .select("protocol, company_name, complaint_type, complaint_subtype")
-      .eq("id", ticket.sac_request_id)
-      .maybeSingle();
-
-    if (sacError) {
-      console.error("Error fetching SAC request:", sacError);
+    // Get SAC request context (prefer data passed in payload)
+    let sac = sac_request;
+    
+    if (!sac) {
+      console.log("SAC request context not provided in payload, fetching from DB...");
+      const { data: dbSac, error: sacError } = await admin
+        .from("sac_requests")
+        .select("protocol, company_name, complaint_type, complaint_subtype")
+        .eq("id", ticket.sac_request_id)
+        .maybeSingle();
+      
+      if (sacError) {
+        console.error("Error fetching SAC request:", sacError);
+      }
+      sac = dbSac;
     }
 
-
     const protocol = sac?.protocol ?? "N/A";
-    const companyName = sac?.company_name ?? "Não informada";
+    const companyName = sac?.company_name ?? sac?.name ?? "Não informada";
     const complaintType = sac?.complaint_type ?? "Geral";
     const complaintSubtype = sac?.complaint_subtype ? ` - ${sac.complaint_subtype}` : "";
+
     const author = ticket.author_name || ticket.author_email || "Sistema";
 
     const subject = `[NOTIFICAÇÃO INTERNA] SAC ${protocol} - ${companyName}`;
