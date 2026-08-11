@@ -57,7 +57,7 @@ serve(async (req) => {
       console.log("SAC request context incomplete in payload, fetching from DB for ID:", ticket.sac_request_id);
       const { data: dbSac, error: sacError } = await admin
         .from("sac_requests")
-        .select("protocol, company_name, name, complaint_type, complaint_subtype")
+        .select("protocol, name, complaint_type")
         .eq("id", ticket.sac_request_id)
         .maybeSingle();
       
@@ -66,8 +66,12 @@ serve(async (req) => {
       }
       
       if (dbSac) {
-        // Merge or replace
-        sac = { ...sac, ...dbSac };
+        sac = { 
+          ...sac, 
+          protocol: dbSac.protocol,
+          company_name: dbSac.name,
+          complaint_type: dbSac.complaint_type
+        };
       }
     }
 

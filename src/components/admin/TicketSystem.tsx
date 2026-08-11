@@ -101,7 +101,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
       // Fetch full request context to ensure the Edge Function has everything it needs
       const { data: sacData } = await supabase
         .from('sac_requests')
-        .select('protocol, company_name, name, complaint_type, complaint_subtype')
+        .select('protocol, name, complaint_type')
         .eq('id', sacRequestId)
         .maybeSingle();
 
@@ -113,9 +113,8 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
           ticket: newTicket,
           sac_request: sacData ? {
             protocol: sacData.protocol,
-            company_name: sacData.company_name || sacData.name,
-            complaint_type: sacData.complaint_type,
-            complaint_subtype: sacData.complaint_subtype
+            company_name: sacData.name, // Use 'name' as 'company_name'
+            complaint_type: sacData.complaint_type
           } : null
         };
         
