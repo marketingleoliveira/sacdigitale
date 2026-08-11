@@ -50,11 +50,16 @@ serve(async (req) => {
     }
 
     // Get SAC request context
-    const { data: sac } = await admin
+    const { data: sac, error: sacError } = await admin
       .from("sac_requests")
       .select("protocol, company_name, complaint_type, complaint_subtype")
       .eq("id", ticket.sac_request_id)
       .maybeSingle();
+
+    if (sacError) {
+      console.error("Error fetching SAC request:", sacError);
+    }
+
 
     const protocol = sac?.protocol ?? "N/A";
     const companyName = sac?.company_name ?? "Não informada";
