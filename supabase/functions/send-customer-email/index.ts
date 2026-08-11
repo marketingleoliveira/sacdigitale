@@ -163,6 +163,7 @@ serve(async (req) => {
       subject: finalSubject, body, resend_id: resendData.id, sent_by: user.id,
       sent_by_email: user.email, status: "sent",
       attachments: attachmentMeta,
+      email_body: htmlBody
     });
 
     // Explicit "recibo" (receipt) email back to qualidade@ confirming delivery to the customer.

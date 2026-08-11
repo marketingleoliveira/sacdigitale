@@ -21,53 +21,79 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-interface InternalLog {
+interface LogEntry {
   id: string;
-  ticket_id: string;
-  status: 'success' | 'failure';
-  error_message: string | null;
-  recipient_email: string;
+  ticket_id?: string;
+  sac_request_id?: string;
+  status: 'success' | 'failure' | 'sent' | 'failed' | 'inbound';
+  error_message?: string | null;
+  recipient_email?: string;
+  from_email?: string;
+  to_email?: string;
   created_at: string;
   email_body?: string;
   subject?: string;
-  tickets: {
+  direction?: 'inbound' | 'outbound';
+  tickets?: {
     message: string;
     sac_requests: {
       protocol: string;
       name: string;
     } | null;
   } | null;
+  sac_requests?: {
+    protocol: string;
+    name: string;
+  } | null;
 }
 
 export default function InternalSettings() {
-  const [logs, setLogs] = useState<InternalLog[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedLog, setSelectedLog] = useState<InternalLog | null>(null);
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal');
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [activeTab]);
 
   const fetchLogs = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('internal_ticket_logs')
-        .select(`
-          *,
-          tickets (
-            message,
+      if (activeTab === 'internal') {
+        const { data, error } = await supabase
+          .from('internal_ticket_logs')
+          .select(`
+            *,
+            tickets (
+              message,
+              sac_requests (
+                protocol,
+                name
+              )
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error) throw error;
+        setLogs((data as any) || []);
+      } else {
+        const { data, error } = await supabase
+          .from('email_communications')
+          .select(`
+            *,
             sac_requests (
               protocol,
               name
             )
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
+          `)
+          .order('created_at', { ascending: false })
+          .limit(50);
 
-      if (error) throw error;
-      setLogs((data as any) || []);
+        if (error) throw error;
+        setLogs((data as any) || []);
+      }
     } catch (error) {
       console.error('Error fetching logs:', error);
       toast.error('Erro ao carregar logs de envio');
@@ -89,11 +115,29 @@ export default function InternalSettings() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
-            Logs de Notificação de Tickets Internos
+            Logs de Notificação
           </CardTitle>
+          <div className="flex bg-muted p-1 rounded-md">
+            <Button 
+              variant={activeTab === 'internal' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              className="text-xs h-7"
+              onClick={() => setActiveTab('internal')}
+            >
+              Interno
+            </Button>
+            <Button 
+              variant={activeTab === 'external' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              className="text-xs h-7"
+              onClick={() => setActiveTab('external')}
+            >
+              Externo
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -111,7 +155,7 @@ export default function InternalSettings() {
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Protocolo / Empresa</TableHead>
-                    <TableHead>Destinatário</TableHead>
+                    <TableHead>{activeTab === 'internal' ? 'Destinatário' : 'Fluxo'}</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Detalhes</TableHead>
                     <TableHead className="w-[80px]">Ver</TableHead>
@@ -126,21 +170,33 @@ export default function InternalSettings() {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-mono text-xs text-muted-foreground">
-                            {log.tickets?.sac_requests?.protocol || '—'}
+                            {log.tickets?.sac_requests?.protocol || log.sac_requests?.protocol || '—'}
                           </span>
                           <span className="font-medium text-sm">
-                            {log.tickets?.sac_requests?.name || 'Sistema'}
+                            {log.tickets?.sac_requests?.name || log.sac_requests?.name || 'Sistema'}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {log.recipient_email}
+                        {activeTab === 'internal' ? (
+                          log.recipient_email
+                        ) : (
+                          <div className="flex flex-col text-xs">
+                            <span className="text-muted-foreground">De: {log.from_email}</span>
+                            <span className="text-muted-foreground">Para: {log.to_email}</span>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
-                        {log.status === 'success' ? (
+                        {log.status === 'success' || log.status === 'sent' ? (
                           <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
                             <ShieldCheck className="h-3 w-3 mr-1" />
-                            Sucesso
+                            {log.direction === 'inbound' ? 'Recebido' : 'Sucesso'}
+                          </Badge>
+                        ) : log.status === 'inbound' ? (
+                          <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                            Recebido
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
@@ -150,7 +206,7 @@ export default function InternalSettings() {
                         )}
                       </TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate text-muted-foreground">
-                        {log.error_message || 'Notificação enviada com sucesso'}
+                        {log.error_message || (activeTab === 'internal' ? 'Notificação enviada com sucesso' : log.subject)}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -177,7 +233,7 @@ export default function InternalSettings() {
             <DialogTitle className="text-lg">Conteúdo da Notificação</DialogTitle>
             <div className="flex flex-col gap-1 mt-2 text-sm text-muted-foreground">
               <p><strong>Assunto:</strong> {selectedLog?.subject || 'N/A'}</p>
-              <p><strong>Destinatário:</strong> {selectedLog?.recipient_email}</p>
+              <p><strong>{activeTab === 'internal' ? 'Destinatário:' : 'Fluxo:'}</strong> {selectedLog?.recipient_email || `${selectedLog?.from_email} → ${selectedLog?.to_email}`}</p>
             </div>
           </DialogHeader>
           <ScrollArea className="flex-1 p-6">
