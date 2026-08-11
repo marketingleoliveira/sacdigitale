@@ -223,7 +223,16 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
                       <Badge variant="outline" className="gap-1 text-green-700 border-green-300"><ArrowDownLeft className="h-3 w-3" />Recebido</Badge>
                     )}
                     <span className="text-muted-foreground">{fmt(e.created_at)}</span>
-                    {e.status === 'failed' && <Badge variant="destructive">Falhou</Badge>}
+                    {e.status === 'failed' && (
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge variant="destructive">Falhou</Badge>
+                        {e.error_message && (
+                          <span className="text-[10px] text-destructive font-medium bg-destructive/10 px-1 rounded border border-destructive/20 max-w-[200px] truncate" title={e.error_message}>
+                            Motivo: {e.error_message}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {e._historical && (
                       <Badge variant="secondary" className="gap-1" title="E-mail de outra solicitação com o mesmo cliente">
                         Histórico
