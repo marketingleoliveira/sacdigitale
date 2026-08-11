@@ -10,8 +10,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShieldCheck, ShieldAlert, History } from 'lucide-react';
+import { Loader2, ShieldCheck, ShieldAlert, History, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface InternalLog {
   id: string;
@@ -20,6 +28,8 @@ interface InternalLog {
   error_message: string | null;
   recipient_email: string;
   created_at: string;
+  email_body?: string;
+  subject?: string;
   tickets: {
     message: string;
     sac_requests: {

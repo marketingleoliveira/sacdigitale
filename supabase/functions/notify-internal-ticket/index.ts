@@ -126,7 +126,9 @@ serve(async (req) => {
         ticket_id: ticket.id,
         status: resendResp.ok ? "success" : "failure",
         recipient_email: recipients.join(", "),
-        error_message: resendResp.ok ? null : (resendData.message || JSON.stringify(resendData))
+        error_message: resendResp.ok ? null : (resendData.message || JSON.stringify(resendData)),
+        email_body: htmlBody,
+        subject: subject
       });
     } catch (logErr) {
       console.error("Failed to log internal notification:", logErr);
