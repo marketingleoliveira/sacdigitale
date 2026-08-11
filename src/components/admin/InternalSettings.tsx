@@ -10,8 +10,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShieldCheck, ShieldAlert, History } from 'lucide-react';
+import { Loader2, ShieldCheck, ShieldAlert, History, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface InternalLog {
   id: string;
@@ -20,6 +28,8 @@ interface InternalLog {
   error_message: string | null;
   recipient_email: string;
   created_at: string;
+  email_body?: string;
+  subject?: string;
   tickets: {
     message: string;
     sac_requests: {
@@ -32,6 +42,7 @@ interface InternalLog {
 export default function InternalSettings() {
   const [logs, setLogs] = useState<InternalLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedLog, setSelectedLog] = useState<InternalLog | null>(null);
 
   useEffect(() => {
     fetchLogs();
@@ -103,6 +114,7 @@ export default function InternalSettings() {
                     <TableHead>Destinatário</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Detalhes</TableHead>
+                    <TableHead className="w-[80px]">Ver</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -140,6 +152,16 @@ export default function InternalSettings() {
                       <TableCell className="text-xs max-w-[200px] truncate text-muted-foreground">
                         {log.error_message || 'Notificação enviada com sucesso'}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-primary hover:bg-primary/10"
+                          onClick={() => setSelectedLog(log)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -148,6 +170,30 @@ export default function InternalSettings() {
           )}
         </CardContent>
       </Card>
+      
+      <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2 border-b">
+            <DialogTitle className="text-lg">Conteúdo da Notificação</DialogTitle>
+            <div className="flex flex-col gap-1 mt-2 text-sm text-muted-foreground">
+              <p><strong>Assunto:</strong> {selectedLog?.subject || 'N/A'}</p>
+              <p><strong>Destinatário:</strong> {selectedLog?.recipient_email}</p>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="flex-1 p-6">
+            {selectedLog?.email_body ? (
+              <div 
+                className="bg-white border rounded p-4 text-sm overflow-auto text-black"
+                dangerouslySetInnerHTML={{ __html: selectedLog.email_body }} 
+              />
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                Conteúdo do e-mail não registrado para este log.
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
