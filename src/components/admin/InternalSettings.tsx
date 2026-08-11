@@ -42,6 +42,7 @@ interface InternalLog {
 export default function InternalSettings() {
   const [logs, setLogs] = useState<InternalLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedLog, setSelectedLog] = useState<InternalLog | null>(null);
 
   useEffect(() => {
     fetchLogs();

@@ -148,26 +148,32 @@ export type Database = {
       internal_ticket_logs: {
         Row: {
           created_at: string | null
+          email_body: string | null
           error_message: string | null
           id: string
           recipient_email: string
           status: string
+          subject: string | null
           ticket_id: string
         }
         Insert: {
           created_at?: string | null
+          email_body?: string | null
           error_message?: string | null
           id?: string
           recipient_email: string
           status: string
+          subject?: string | null
           ticket_id: string
         }
         Update: {
           created_at?: string | null
+          email_body?: string | null
           error_message?: string | null
           id?: string
           recipient_email?: string
           status?: string
+          subject?: string | null
           ticket_id?: string
         }
         Relationships: [
