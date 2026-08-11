@@ -199,10 +199,17 @@ export default function InternalSettings() {
                             Recebido
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
-                            <ShieldAlert className="h-3 w-3 mr-1" />
-                            Falha
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
+                              <ShieldAlert className="h-3 w-3 mr-1" />
+                              Falha
+                            </Badge>
+                            {log.error_message && (
+                              <span className="text-[10px] text-red-600 font-medium truncate max-w-[120px]" title={log.error_message}>
+                                {log.error_message}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate text-muted-foreground">

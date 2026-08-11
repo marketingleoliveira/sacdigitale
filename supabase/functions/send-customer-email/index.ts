@@ -142,7 +142,7 @@ serve(async (req) => {
         sac_request_id, direction: "outbound", from_email: FROM_EMAIL, to_email: to,
         bcc_email: useBcc ? bccEmail : null,
         subject: finalSubject, body, sent_by: user.id, sent_by_email: user.email,
-        status: "failed", error_message: JSON.stringify(resendData),
+        status: "failed", error_message: resendData?.error?.message || resendData?.message || JSON.stringify(resendData),
         attachments: attachmentMeta,
       });
       return new Response(JSON.stringify({ error: "Falha no envio", details: resendData }), {

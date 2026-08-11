@@ -404,8 +404,8 @@ Deno.serve(async (req) => {
         const to = extractEmail(decodeMimeHeader(headers["to"] ?? "")) || user;
         const messageId = (headers["message-id"] ?? "").replace(/[<>]/g, "").trim() || null;
 
-        const fullText = extractReadableText(headers, body);
-        const text = stripQuotedReply(fullText).slice(0, 20_000).trim();
+        const htmlBody = extractReadableText(headers, body); // For inbound, let's keep the raw-ish HTML if possible, or readable text
+        const text = stripQuotedReply(htmlBody).slice(0, 20_000).trim();
         const protocol = findProtocol(subject, fullText, body);
         let sacRequestId: string | null = null;
         if (protocol) {
@@ -479,6 +479,7 @@ Deno.serve(async (req) => {
           status: sacRequestId ? (direction === "outbound" ? "sent" : "received") : "unlinked",
           resend_id: messageId,
           raw_payload: { source: "imap-locaweb", uid, messageId, date: headers["date"] ?? null, auto_classified: direction, is_internal: isInternal },
+          email_body: htmlBody,
         });
         if (insErr) { failed++; errors.push(`uid ${uid}: ${insErr.message}`); continue; }
 
