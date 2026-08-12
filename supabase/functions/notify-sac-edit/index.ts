@@ -38,14 +38,15 @@ serve(async (req) => {
 
     const protocol = sac_request?.protocol ?? "N/A";
     const companyName = sac_request?.name ?? "Não informada";
-    const editorEmail = edit_data?.editor_email ?? "Comercial";
+    const editorEmail = edit_data?.editor_email ?? "Colaborador";
+    const fieldEdited = edit_data?.field_name ?? "Nota Fiscal";
     const timestamp = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
-    const subject = `[EDIÇÃO SAC] SAC ${protocol} - Alteração por Vendas`;
+    const subject = `[EDIÇÃO SAC] SAC ${protocol} - Alteração em ${fieldEdited}`;
     const htmlBody = `
       <div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6">
         <h2 style="color:#0f172a">Edição Recente no SAC</h2>
-        <p>Uma alteração foi realizada no SAC por um membro da equipe de vendas:</p>
+        <p>Uma alteração foi realizada no SAC por um membro da equipe (Vendas):</p>
         
         <div style="background-color:#f1f5f9; padding:12px; border-radius:6px; margin-bottom:15px;">
           <p style="margin:0;"><strong>Empresa:</strong> ${companyName}</p>
@@ -55,9 +56,9 @@ serve(async (req) => {
         </div>
 
         <div style="background-color:#fffbeb; border-left:4px solid #f59e0b; padding:15px; margin:20px 0;">
-          <p style="margin:0;"><strong>Campo Alterado:</strong> Nota Fiscal</p>
-          <p style="margin:0;"><strong>Novo Valor:</strong> ${edit_data.new_value || '(vazio)'}</p>
-          <p style="margin:0; font-size:12px; color:#6b7280; margin-top:10px;">Valor anterior: ${edit_data.old_value || '(vazio)'}</p>
+          <p style="margin:0;"><strong>Campo Alterado:</strong> ${fieldEdited}</p>
+          <p style="margin:0;"><strong>Novo Valor:</strong> ${edit_data.new_value || '(alterado)'}</p>
+          <p style="margin:0; font-size:12px; color:#6b7280; margin-top:10px;">Valor anterior: ${edit_data.old_value || '(anterior)'}</p>
         </div>
 
         <hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0">

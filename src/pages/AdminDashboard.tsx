@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -110,17 +111,22 @@ export default function AdminDashboard() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingProcedencia, setIsUpdatingProcedencia] = useState(false);
   const [isUpdatingComplaintType, setIsUpdatingComplaintType] = useState(false);
+  const [isUpdatingMessage, setIsUpdatingMessage] = useState(false);
   const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
   const [invoiceDraft, setInvoiceDraft] = useState<string>('');
+  const [messageDraft, setMessageDraft] = useState<string>('');
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<boolean>(false);
-  const readOnly = (isVendas && !selectedRequest) || viewMode; // Vendas can edit if a request is selected
-  const canEditInvoice = (isAdmin && !viewMode) || (isVendas && !viewMode); // Permission to edit invoice specifically
+  const readOnly = viewMode;
+  const canEditInvoice = (isAdmin && !isVendas && !viewMode); // Vendas cannot edit invoice anymore
+  const canEditSalesFields = (isAdmin && !viewMode); // General staff can edit fields allowed for sales
+  const canEditAdminFields = (isAdmin && !isVendas && !viewMode); // Fields restricted from sales
 
   useEffect(() => {
     setInvoiceDraft(selectedRequest?.order_number || '');
+    setMessageDraft(selectedRequest?.message || '');
   }, [selectedRequest?.id]);
 
   const updateRequestInvoice = async (requestId: string, newValue: string) => {
@@ -182,6 +188,69 @@ export default function AdminDashboard() {
       toast.error('Erro ao atualizar Nota Fiscal');
     } finally {
       setIsUpdatingInvoice(false);
+    }
+  };
+
+  const updateRequestMessage = async (requestId: string, newValue: string) => {
+    const trimmed = newValue.trim();
+    const previous = selectedRequest?.message || '';
+    if (trimmed === previous) {
+      toast.info('Nenhuma alteração na mensagem');
+      return;
+    }
+    setIsUpdatingMessage(true);
+    try {
+      const { error } = await supabase
+        .from('sac_requests')
+        .update({ message: trimmed })
+        .eq('id', requestId);
+      if (error) throw error;
+
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, message: trimmed } : r))
+      );
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest((prev) => (prev ? { ...prev, message: trimmed } : null));
+      }
+
+      const authorName = user?.email ? user.email.split('@')[0] : 'Admin';
+      const logMessage = `${authorName.charAt(0).toUpperCase() + authorName.slice(1)} editou a mensagem do SAC.`;
+      
+      if (user) {
+        await supabase.from('tickets').insert({
+          sac_request_id: requestId,
+          created_by: user.id,
+          message: logMessage,
+          is_internal: true,
+          author_email: user.email || null,
+        });
+      }
+
+      try {
+        await supabase.functions.invoke('notify-sac-edit', {
+          body: {
+            edit_data: {
+              editor_email: user.email,
+              field_name: 'Mensagem',
+              old_value: '(contúdo extenso)',
+              new_value: '(conteúdo atualizado)',
+            },
+            sac_request: {
+              protocol: selectedRequest?.protocol,
+              name: selectedRequest?.name
+            }
+          }
+        });
+      } catch (notifyErr) {
+        console.error('Error triggering edit notification:', notifyErr);
+      }
+
+      toast.success('Mensagem atualizada');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao atualizar mensagem');
+    } finally {
+      setIsUpdatingMessage(false);
     }
   };
 
@@ -332,6 +401,31 @@ export default function AdminDashboard() {
       toast.error('Erro ao atualizar tipo de reclamação');
     } finally {
       setIsUpdatingComplaintType(false);
+    }
+  };
+
+  const updateRequestComplaintTypeWithNotification = async (requestId: string, complaintType: string | null) => {
+    const previous = (selectedRequest as any)?.complaint_type || '';
+    await updateRequestComplaintType(requestId, complaintType);
+    
+    // Trigger notification
+    try {
+      await supabase.functions.invoke('notify-sac-edit', {
+        body: {
+          edit_data: {
+            editor_email: user.email,
+            field_name: 'Tipo de Reclamação',
+            old_value: previous,
+            new_value: complaintType || '',
+          },
+          sac_request: {
+            protocol: selectedRequest?.protocol,
+            name: selectedRequest?.name
+          }
+        }
+      });
+    } catch (notifyErr) {
+      console.error('Error triggering edit notification:', notifyErr);
     }
   };
 
@@ -936,7 +1030,7 @@ export default function AdminDashboard() {
                       <Select
                         value={selectedRequest.status}
                         onValueChange={(value) => updateRequestStatus(selectedRequest.id, value)}
-                        disabled={isUpdatingStatus || readOnly}
+                        disabled={isUpdatingStatus || !canEditAdminFields}
                       >
                         <SelectTrigger className="w-[180px]">
                           <SelectValue />
@@ -972,7 +1066,7 @@ export default function AdminDashboard() {
                         <Select
                           value={selectedRequest.procedencia || ''}
                           onValueChange={(value) => updateRequestProcedencia(selectedRequest.id, value)}
-                          disabled={isUpdatingProcedencia || readOnly}
+                          disabled={isUpdatingProcedencia || !canEditAdminFields}
                         >
                           <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Selecionar..." />
@@ -1002,8 +1096,8 @@ export default function AdminDashboard() {
                       <div className="mt-1">
                         <Select
                           value={(selectedRequest as any).complaint_type || ''}
-                          onValueChange={(value) => updateRequestComplaintType(selectedRequest.id, value)}
-                          disabled={isUpdatingComplaintType || readOnly}
+                          onValueChange={(value) => updateRequestComplaintTypeWithNotification(selectedRequest.id, value)}
+                          disabled={isUpdatingComplaintType || !canEditSalesFields}
                         >
                           <SelectTrigger className="w-[220px]">
                             <SelectValue placeholder="Selecionar..." />
@@ -1029,8 +1123,25 @@ export default function AdminDashboard() {
 
                 <div>
                   <Label className="text-muted-foreground text-xs">Mensagem</Label>
-                  <div className="mt-1 p-4 bg-muted rounded-lg">
-                    <p className="whitespace-pre-wrap">{selectedRequest.message}</p>
+                  <div className="mt-1 space-y-2">
+                    <Textarea
+                      value={messageDraft}
+                      onChange={(e) => setMessageDraft(e.target.value)}
+                      className="min-h-[120px] bg-muted"
+                      disabled={isUpdatingMessage || !canEditSalesFields}
+                    />
+                    {canEditSalesFields && (
+                      <div className="flex justify-end">
+                        <Button 
+                          size="sm" 
+                          onClick={() => updateRequestMessage(selectedRequest.id, messageDraft)}
+                          disabled={isUpdatingMessage || messageDraft.trim() === selectedRequest.message}
+                        >
+                          {isUpdatingMessage ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Salvar Mensagem
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
 

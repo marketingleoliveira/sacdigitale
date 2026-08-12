@@ -11,6 +11,7 @@ interface LaudosUploadProps {
 }
 
 export default function LaudosUpload({ sacRequestId, existingLaudos, onLaudosChange }: LaudosUploadProps) {
+  const { isVendas } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -197,6 +198,7 @@ export default function LaudosUpload({ sacRequestId, existingLaudos, onLaudosCha
                   size="icon"
                   className="h-7 w-7 hover:bg-destructive/10"
                   onClick={() => removeLaudo(path)}
+                  disabled={isVendas}
                 >
                   <X className="h-3.5 w-3.5 text-destructive" />
                 </Button>
