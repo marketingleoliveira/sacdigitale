@@ -118,7 +118,7 @@ export default function InternalSettings() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5 text-primary" />
-            Logs de Notificação
+            Logs de Notificação (E-mail)
           </CardTitle>
           <div className="flex bg-muted p-1 rounded-md">
             <Button 

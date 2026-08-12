@@ -65,6 +65,7 @@ import {
   Video,
   ExternalLink,
   Trash2,
+  History,
 } from 'lucide-react';
 import { LayoutDashboard, Mail, Shield } from 'lucide-react';
 import { EyeOff } from 'lucide-react';
@@ -79,6 +80,7 @@ const MonthSummary = lazy(() => import('@/components/admin/MonthSummary'));
 const ComplaintTypesManagement = lazy(() => import('@/components/admin/ComplaintTypesManagement'));
 const ExternalSettings = lazy(() => import('@/components/admin/ExternalSettings'));
 const InternalSettings = lazy(() => import('@/components/admin/InternalSettings'));
+const EditLogs = lazy(() => import('@/components/admin/EditLogs'));
 import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -623,10 +625,16 @@ export default function AdminDashboard() {
               </TabsTrigger>
             )}
             {role === 'desenvolvedor' && (
-              <TabsTrigger value="internal-settings" className="gap-2">
-                <Shield className="h-4 w-4" />
-                Configurações Internas
-              </TabsTrigger>
+              <>
+                <TabsTrigger value="internal-settings" className="gap-2">
+                  <Shield className="h-4 w-4" />
+                  Logs de Notificação
+                </TabsTrigger>
+                <TabsTrigger value="edit-logs" className="gap-2">
+                  <History className="h-4 w-4" />
+                  Logs de Edição
+                </TabsTrigger>
+              </>
             )}
           </TabsList>
 
@@ -948,9 +956,14 @@ export default function AdminDashboard() {
             )}
 
             {role === 'desenvolvedor' && (
-              <TabsContent value="internal-settings">
-                <InternalSettings />
-              </TabsContent>
+              <>
+                <TabsContent value="internal-settings">
+                  <InternalSettings />
+                </TabsContent>
+                <TabsContent value="edit-logs">
+                  <EditLogs />
+                </TabsContent>
+              </>
             )}
           </Suspense>
         </Tabs>
