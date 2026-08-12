@@ -189,6 +189,47 @@ export type Database = {
           },
         ]
       }
+      sac_edit_logs: {
+        Row: {
+          created_at: string | null
+          edited_by: string | null
+          edited_by_email: string | null
+          field_edited: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          sac_request_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          edited_by?: string | null
+          edited_by_email?: string | null
+          field_edited?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          sac_request_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          edited_by?: string | null
+          edited_by_email?: string | null
+          field_edited?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          sac_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sac_edit_logs_sac_request_id_fkey"
+            columns: ["sac_request_id"]
+            isOneToOne: false
+            referencedRelation: "sac_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sac_requests: {
         Row: {
           attachments: string[] | null

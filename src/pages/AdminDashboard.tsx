@@ -116,7 +116,8 @@ export default function AdminDashboard() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<boolean>(false);
-  const readOnly = isVendas || viewMode;
+  const readOnly = (isVendas && !selectedRequest) || viewMode; // Vendas can edit if a request is selected
+  const canEditInvoice = (isAdmin && !viewMode) || (isVendas && !viewMode); // Permission to edit invoice specifically
 
   useEffect(() => {
     setInvoiceDraft(selectedRequest?.order_number || '');
@@ -154,6 +155,25 @@ export default function AdminDashboard() {
           is_internal: true,
           author_email: user.email || null,
         });
+      }
+
+      // Trigger notification for edit
+      try {
+        await supabase.functions.invoke('notify-sac-edit', {
+          body: {
+            edit_data: {
+              editor_email: user.email,
+              old_value: previous,
+              new_value: trimmed,
+            },
+            sac_request: {
+              protocol: selectedRequest?.protocol,
+              name: selectedRequest?.name
+            }
+          }
+        });
+      } catch (notifyErr) {
+        console.error('Error triggering edit notification:', notifyErr);
       }
 
       toast.success('Nota Fiscal atualizada');
