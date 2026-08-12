@@ -284,6 +284,41 @@ export type Database = {
         }
         Relationships: []
       }
+      sac_updates: {
+        Row: {
+          author_email: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          message: string
+          sac_request_id: string
+        }
+        Insert: {
+          author_email?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          message: string
+          sac_request_id: string
+        }
+        Update: {
+          author_email?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          message?: string
+          sac_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sac_updates_sac_request_id_fkey"
+            columns: ["sac_request_id"]
+            isOneToOne: false
+            referencedRelation: "sac_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
           assigned_to: string | null

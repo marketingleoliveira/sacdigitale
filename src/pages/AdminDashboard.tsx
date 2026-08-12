@@ -85,7 +85,9 @@ import logoBlue from '@/assets/logo-blue.png';
 import type { Database } from '@/integrations/supabase/types';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
+type SACUpdate = Database['public']['Tables']['sac_updates']['Row'];
 type ContactType = Database['public']['Enums']['contact_type'];
+
 
 const contactTypeConfig: Record<ContactType, { label: string; icon: typeof AlertTriangle; color: string }> = {
   reclamacao: { label: 'Reclamação', icon: AlertTriangle, color: 'bg-red-100 text-red-700 border-red-200' },
@@ -114,12 +116,16 @@ export default function AdminDashboard() {
   const [isUpdatingProcedencia, setIsUpdatingProcedencia] = useState(false);
   const [isUpdatingComplaintType, setIsUpdatingComplaintType] = useState(false);
   const [isUpdatingMessage, setIsUpdatingMessage] = useState(false);
+  const [isAddingUpdate, setIsAddingUpdate] = useState(false);
+  const [sacUpdates, setSacUpdates] = useState<SACUpdate[]>([]);
   const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
   const [invoiceDraft, setInvoiceDraft] = useState<string>('');
   const [messageDraft, setMessageDraft] = useState<string>('');
+  const [updateDraft, setUpdateDraft] = useState<string>('');
   const [isUpdatingInvoice, setIsUpdatingInvoice] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
+
   const [viewMode, setViewMode] = useState<boolean>(false);
   const readOnly = viewMode;
   const canEditInvoice = (isAdmin && !isVendas && !viewMode); // Vendas cannot edit invoice anymore
@@ -256,6 +262,82 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchSacUpdates = async (requestId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('sac_updates')
+        .select('*')
+        .eq('sac_request_id', requestId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setSacUpdates(data || []);
+    } catch (error) {
+      console.error('Error fetching sac updates:', error);
+    }
+  };
+
+  const addSacUpdate = async (requestId: string, message: string) => {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    setIsAddingUpdate(true);
+    try {
+      const { data, error } = await supabase
+        .from('sac_updates')
+        .insert({
+          sac_request_id: requestId,
+          message: trimmed,
+          created_by: user?.id,
+          author_email: user?.email || null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      setSacUpdates((prev) => [...prev, data]);
+      setUpdateDraft('');
+      toast.success('Atualização adicionada');
+
+      // Add to internal tickets as a log
+      if (user) {
+        const authorName = user.email ? user.email.split('@')[0] : 'Admin';
+        const logMessage = `${authorName.charAt(0).toUpperCase() + authorName.slice(1)} adicionou uma atualização ao SAC: "${trimmed.substring(0, 50)}${trimmed.length > 50 ? '...' : ''}"`;
+        await supabase.from('tickets').insert({
+          sac_request_id: requestId,
+          created_by: user.id,
+          message: logMessage,
+          is_internal: true,
+          author_email: user.email || null,
+        });
+      }
+
+      // Trigger notification for the new update
+      try {
+        await supabase.functions.invoke('notify-sac-edit', {
+          body: {
+            edit_data: {
+              editor_email: user?.email,
+              field_name: 'Atualização do SAC',
+              old_value: '(Nova atualização)',
+              new_value: trimmed,
+            },
+            sac_request: {
+              protocol: selectedRequest?.protocol,
+              name: selectedRequest?.name
+            }
+          }
+        });
+      } catch (notifyErr) {
+        console.error('Error triggering update notification:', notifyErr);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao adicionar atualização');
+    } finally {
+      setIsAddingUpdate(false);
+    }
+  };
+
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -357,7 +439,10 @@ export default function AdminDashboard() {
 
   const openRequest = async (request: SACRequest) => {
     setSelectedRequest(request);
+    fetchSacUpdates(request.id);
+    setUpdateDraft('');
     if (unreadByRequest[request.id]) {
+
       const { error } = await supabase
         .from('email_communications')
         .update({ read_at: new Date().toISOString() })
@@ -1135,28 +1220,65 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <Label className="text-muted-foreground text-xs">Mensagem</Label>
-                  <div className="mt-1 space-y-2">
+                  <Label className="text-muted-foreground text-xs">Mensagem Original</Label>
+                  <div className="mt-1">
                     <Textarea
                       value={messageDraft}
-                      onChange={(e) => setMessageDraft(e.target.value)}
-                      className="min-h-[120px] bg-muted"
-                      disabled={isUpdatingMessage || !canEditSalesFields}
+                      className="min-h-[100px] bg-muted/50"
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                {/* Updates Section */}
+                <div className="space-y-4 pt-4 border-t">
+                  <Label className="text-muted-foreground text-xs font-bold uppercase tracking-wider">
+                    Atualizações da Solicitação
+                  </Label>
+                  
+                  {sacUpdates.length > 0 && (
+                    <div className="space-y-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                      {sacUpdates.map((update) => (
+                        <div key={update.id} className="text-sm border-b border-border/50 last:border-0 pb-2 mb-2 last:pb-0 last:mb-0">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-semibold text-xs text-primary">
+                              {update.author_email ? update.author_email.split('@')[0] : 'Equipe'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatDate(update.created_at)}
+                            </span>
+                          </div>
+                          <p className="whitespace-pre-wrap">{update.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="update-field" className="text-xs">Adicionar atualizações</Label>
+                    <Textarea
+                      id="update-field"
+                      placeholder="Descreva aqui as novas informações ou atualizações sobre este SAC..."
+                      value={updateDraft}
+                      onChange={(e) => setUpdateDraft(e.target.value)}
+                      className="min-h-[80px]"
+                      disabled={isAddingUpdate || !canEditSalesFields}
                     />
                     {canEditSalesFields && (
                       <div className="flex justify-end">
                         <Button 
                           size="sm" 
-                          onClick={() => updateRequestMessage(selectedRequest.id, messageDraft)}
-                          disabled={isUpdatingMessage || messageDraft.trim() === selectedRequest.message}
+                          onClick={() => addSacUpdate(selectedRequest.id, updateDraft)}
+                          disabled={isAddingUpdate || !updateDraft.trim()}
                         >
-                          {isUpdatingMessage ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          Salvar Mensagem
+                          {isAddingUpdate ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Salvar Atualização
                         </Button>
                       </div>
                     )}
                   </div>
                 </div>
+
 
                 {/* Attachments Preview */}
                 {selectedRequest.attachments && selectedRequest.attachments.length > 0 && (
