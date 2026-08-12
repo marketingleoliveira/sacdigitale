@@ -65,6 +65,7 @@ import {
   Video,
   ExternalLink,
   Trash2,
+  History,
 } from 'lucide-react';
 import { LayoutDashboard, Mail, Shield } from 'lucide-react';
 import { EyeOff } from 'lucide-react';
