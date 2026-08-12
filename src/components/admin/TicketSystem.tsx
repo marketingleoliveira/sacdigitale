@@ -262,7 +262,7 @@ export default function TicketSystem({ sacRequestId, currentUserId, currentUserE
       </ScrollArea>
 
       {/* New Message Input */}
-      {(!isVendas) && (
+      {!isVendas && (
       <div className="space-y-2">
         <Label htmlFor="new-ticket-message" className="text-sm text-muted-foreground">
           Nova anotação interna
