@@ -908,9 +908,9 @@ export default function AdminDashboard() {
                         onChange={(e) => setInvoiceDraft(e.target.value)}
                         placeholder="Digite a Nota Fiscal"
                         maxLength={100}
-                        disabled={isUpdatingInvoice || readOnly}
+                        disabled={isUpdatingInvoice || !canEditInvoice}
                       />
-                      {!readOnly && (
+                      {canEditInvoice && (
                       <Button
                         onClick={() => updateRequestInvoice(selectedRequest.id, invoiceDraft)}
                         disabled={isUpdatingInvoice || invoiceDraft.trim() === (selectedRequest.order_number || '')}
