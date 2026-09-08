@@ -826,7 +826,7 @@ export default function MonthlyReports() {
                 )}
 
                 {/* Export Button */}
-                <div className="pt-2 border-t">
+                <div className="pt-2 border-t flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -837,6 +837,17 @@ export default function MonthlyReports() {
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Exportar Relatório PDF
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportMonthXlsx(stats);
+                    }}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Exportar Excel
                   </Button>
                 </div>
               </CardContent>
