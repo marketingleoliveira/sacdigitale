@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Download, BarChart3 } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, Clock, FileText, Download, BarChart3, FileSpreadsheet } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoWhite from '@/assets/logo-white.png';
 import type { Database } from '@/integrations/supabase/types';
+import { exportMonthExcel, exportConsolidatedExcel, type ExcelSacRow } from '@/lib/reportExcel';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
 
@@ -683,6 +684,33 @@ export default function MonthlyReports() {
     await exportConsolidatedPDF(selectedStats, items);
   };
 
+  const exportConsolidatedXlsx = async () => {
+    if (selectedKeys.length === 0) {
+      toast.error('Selecione ao menos um mês.');
+      return;
+    }
+    const sortedKeys = [...selectedKeys].sort();
+    const selectedStats = monthlyStats.filter((s) => selectedMonths[s.month]);
+    const items = sortedKeys.flatMap((k) => grouped[k] || []) as unknown as ExcelSacRow[];
+    try {
+      await exportConsolidatedExcel(selectedStats, items);
+      toast.success('Planilha consolidada exportada!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao gerar a planilha.');
+    }
+  };
+
+  const exportMonthXlsx = async (stats: MonthlyStats) => {
+    try {
+      await exportMonthExcel(stats.monthLabel, (grouped[stats.month] || []) as unknown as ExcelSacRow[], stats);
+      toast.success(`Planilha de ${stats.monthLabel} exportada!`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao gerar a planilha.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -716,7 +744,11 @@ export default function MonthlyReports() {
             <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedKeys.length === 0}>Limpar</Button>
             <Button size="sm" onClick={exportConsolidated} disabled={selectedKeys.length === 0}>
               <Download className="h-4 w-4 mr-2" />
-              Exportar consolidado
+              Exportar consolidado (PDF)
+            </Button>
+            <Button size="sm" variant="secondary" onClick={exportConsolidatedXlsx} disabled={selectedKeys.length === 0}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Exportar consolidado (Excel)
             </Button>
           </div>
         </CardContent>
@@ -794,7 +826,7 @@ export default function MonthlyReports() {
                 )}
 
                 {/* Export Button */}
-                <div className="pt-2 border-t">
+                <div className="pt-2 border-t flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -805,6 +837,17 @@ export default function MonthlyReports() {
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Exportar Relatório PDF
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportMonthXlsx(stats);
+                    }}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Exportar Excel
                   </Button>
                 </div>
               </CardContent>
