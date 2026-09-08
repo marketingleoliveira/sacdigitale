@@ -11,6 +11,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoWhite from '@/assets/logo-white.png';
 import type { Database } from '@/integrations/supabase/types';
+import { exportMonthExcel, exportConsolidatedExcel, type ExcelSacRow } from '@/lib/reportExcel';
 
 type SACRequest = Database['public']['Tables']['sac_requests']['Row'];
 
