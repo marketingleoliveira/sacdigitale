@@ -744,7 +744,11 @@ export default function MonthlyReports() {
             <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedKeys.length === 0}>Limpar</Button>
             <Button size="sm" onClick={exportConsolidated} disabled={selectedKeys.length === 0}>
               <Download className="h-4 w-4 mr-2" />
-              Exportar consolidado
+              Exportar consolidado (PDF)
+            </Button>
+            <Button size="sm" variant="secondary" onClick={exportConsolidatedXlsx} disabled={selectedKeys.length === 0}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Exportar consolidado (Excel)
             </Button>
           </div>
         </CardContent>
