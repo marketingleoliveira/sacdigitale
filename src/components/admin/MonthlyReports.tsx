@@ -684,6 +684,33 @@ export default function MonthlyReports() {
     await exportConsolidatedPDF(selectedStats, items);
   };
 
+  const exportConsolidatedXlsx = async () => {
+    if (selectedKeys.length === 0) {
+      toast.error('Selecione ao menos um mês.');
+      return;
+    }
+    const sortedKeys = [...selectedKeys].sort();
+    const selectedStats = monthlyStats.filter((s) => selectedMonths[s.month]);
+    const items = sortedKeys.flatMap((k) => grouped[k] || []) as unknown as ExcelSacRow[];
+    try {
+      await exportConsolidatedExcel(selectedStats, items);
+      toast.success('Planilha consolidada exportada!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao gerar a planilha.');
+    }
+  };
+
+  const exportMonthXlsx = async (stats: MonthlyStats) => {
+    try {
+      await exportMonthExcel(stats.monthLabel, (grouped[stats.month] || []) as unknown as ExcelSacRow[], stats);
+      toast.success(`Planilha de ${stats.monthLabel} exportada!`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao gerar a planilha.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
