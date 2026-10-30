@@ -18,6 +18,18 @@ interface FormData {
 }
 const SACForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // SAC_UPLOAD_PROGRESS_V2
+  const [uploadProgress, setUploadProgress] = useState<{
+    name: string;
+    percent: number;
+    sent: number;
+    total: number;
+    speed: number;
+    elapsed: number;
+    remaining: number | null;
+  } | null>(null);
+
   const [isSuccess, setIsSuccess] = useState(false);
   const [protocol, setProtocol] = useState<string | null>(null);
   const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
@@ -52,26 +64,182 @@ const SACForm = () => {
       [name]: value
     }));
   };
+
   const uploadFiles = async (files: File[]): Promise<string[]> => {
-    const uploadedUrls: string[] = [];
+    const urls: string[] = [];
+    const total = files.reduce((n, f) => n + f.size, 0);
+    const started = performance.now();
+    let completed = 0;
+
+    const formatProgress = (name: string, sent: number) => {
+      const elapsed = Math.max((performance.now() - started) / 1000, 0.01);
+      const speed = sent / elapsed;
+      setUploadProgress({
+        name,
+        percent: total ? Math.min(100, Math.round(sent / total * 100)) : 100,
+        sent,
+        total,
+        speed,
+        elapsed,
+        remaining: speed > 0 ? (total - sent) / speed : null
+      });
+    };
+
     for (const file of files) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `attachments/${fileName}`;
-      const {
-        error: uploadError
-      } = await supabase.storage.from('sac-attachments').upload(filePath, file);
-      if (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw new Error(`Erro ao enviar arquivo: ${file.name}`);
+      const key = `sac-upload-v2:${file.name}:${file.size}:${file.lastModified}`;
+      let session: { id: string; token: string; chunkSize: number } | null = null;
+
+      try {
+        const previous = sessionStorage.getItem(key);
+        if (previous) session = JSON.parse(previous);
+      } catch {
+        sessionStorage.removeItem(key);
       }
-      const {
-        data: urlData
-      } = supabase.storage.from('sac-attachments').getPublicUrl(filePath);
-      uploadedUrls.push(urlData.publicUrl);
+
+      const initialize = async () => {
+        const response = await fetch("/api/uploads/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: file.name,
+            size: file.size,
+            type: file.type || "application/octet-stream"
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Erro ao iniciar upload");
+        session = data;
+        sessionStorage.setItem(key, JSON.stringify(session));
+      };
+
+      if (!session) await initialize();
+
+      let status = await fetch(`/api/uploads/${session!.id}`, {
+        headers: { "x-upload-token": session!.token }
+      });
+
+      if (!status.ok) {
+        sessionStorage.removeItem(key);
+        await initialize();
+        status = await fetch(`/api/uploads/${session!.id}`, {
+          headers: { "x-upload-token": session!.token }
+        });
+        if (!status.ok) throw new Error("Erro ao recuperar upload");
+      }
+
+      let offset = Number((await status.json()).offset);
+      formatProgress(file.name, completed + offset);
+
+      while (offset < file.size) {
+        const end = Math.min(offset + session!.chunkSize, file.size);
+        const part = file.slice(offset, end);
+        let success = false;
+
+        for (let attempt = 0; attempt < 3 && !success; attempt++) {
+          try {
+            const result = await new Promise<{ offset: number }>(
+              (resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+
+                xhr.open(
+                  "PUT",
+                  `/api/uploads/${session!.id}/chunk`
+                );
+
+                xhr.setRequestHeader(
+                  "Content-Type",
+                  "application/octet-stream"
+                );
+                xhr.setRequestHeader(
+                  "x-upload-token",
+                  session!.token
+                );
+                xhr.setRequestHeader(
+                  "x-upload-offset",
+                  String(offset)
+                );
+
+                xhr.timeout = 120000;
+
+                xhr.upload.onprogress = (event) => {
+                  if (event.lengthComputable) {
+                    const transmitted = Math.min(
+                      event.loaded,
+                      part.size
+                    );
+
+                    formatProgress(
+                      file.name,
+                      completed + offset + transmitted
+                    );
+                  }
+                };
+
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                      resolve(JSON.parse(xhr.responseText));
+                    } catch {
+                      reject(new Error("Resposta inválida do servidor"));
+                    }
+                  } else {
+                    reject(new Error(
+                      `Falha no upload: HTTP ${xhr.status}`
+                    ));
+                  }
+                };
+
+                xhr.onerror = () =>
+                  reject(new Error("Falha de conexão no upload"));
+
+                xhr.ontimeout = () =>
+                  reject(new Error("Tempo de envio esgotado"));
+
+                xhr.onabort = () =>
+                  reject(new Error("Upload interrompido"));
+
+                xhr.send(part);
+              }
+            );
+
+            offset = Number(result.offset);
+            success = true;
+            formatProgress(file.name, completed + offset);
+          } catch (error) {
+            if (attempt === 2) throw error;
+
+            const check = await fetch(`/api/uploads/${session!.id}`, {
+              headers: { "x-upload-token": session!.token }
+            });
+            if (!check.ok) throw new Error("Não foi possível retomar o upload");
+            const actual = Number((await check.json()).offset);
+
+            if (actual > offset) {
+              offset = actual;
+              success = true;
+              formatProgress(file.name, completed + offset);
+            }
+          }
+        }
+      }
+
+      const finish = await fetch(`/api/uploads/${session!.id}/complete`, {
+        method: "POST",
+        headers: { "x-upload-token": session!.token }
+      });
+
+      const result = await finish.json();
+      if (!finish.ok) throw new Error(result.error || "Falha ao finalizar upload");
+
+      urls.push(result.url);
+      sessionStorage.removeItem(key);
+      completed += file.size;
+      formatProgress(file.name, completed);
     }
-    return uploadedUrls;
+
+    return urls;
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -280,6 +448,35 @@ const SACForm = () => {
           </div>
         </div>
       </FormSection>
+
+
+      {uploadProgress && (
+        <div className="rounded-xl border border-primary/20 bg-muted/40 p-4 space-y-3" role="status" aria-live="polite">
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="font-medium truncate">{uploadProgress.name}</span>
+            <span className="font-semibold">{uploadProgress.percent}%</span>
+          </div>
+          <div className="h-3 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${uploadProgress.percent}%` }}
+              role="progressbar"
+              aria-valuenow={uploadProgress.percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+            <span>Enviado: {(uploadProgress.sent / 1048576).toFixed(1)} / {(uploadProgress.total / 1048576).toFixed(1)} MB</span>
+            <span>Velocidade: {(uploadProgress.speed / 1048576).toFixed(2)} MB/s</span>
+            <span>Decorrido: {Math.floor(uploadProgress.elapsed)} s</span>
+            <span>Restante estimado: {uploadProgress.remaining === null ? "Calculando..." : `${Math.ceil(uploadProgress.remaining)} s`}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Mantenha esta página aberta enquanto os anexos são enviados.
+          </p>
+        </div>
+      )}
 
       {/* Section 4: Attachments */}
       <FormSection number={4} title="Anexos (opcional)" subtitle="Envie imagens ou documentos que ajudem a esclarecer sua solicitação">

@@ -1,3 +1,4 @@
+import { GitBranch } from 'lucide-react';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -78,6 +79,7 @@ const InactivityWarning = lazy(() => import('@/components/admin/InactivityWarnin
 const MonthlyReports = lazy(() => import('@/components/admin/MonthlyReports'));
 const MonthSummary = lazy(() => import('@/components/admin/MonthSummary'));
 const ComplaintTypesManagement = lazy(() => import('@/components/admin/ComplaintTypesManagement'));
+const ProblemOriginsManagement = lazy(() => import('@/components/admin/ProblemOriginsManagement'));
 const ExternalSettings = lazy(() => import('@/components/admin/ExternalSettings'));
 const InternalSettings = lazy(() => import('@/components/admin/InternalSettings'));
 const EditLogs = lazy(() => import('@/components/admin/EditLogs'));
@@ -118,6 +120,9 @@ export default function AdminDashboard() {
   const [isUpdatingMessage, setIsUpdatingMessage] = useState(false);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [sacUpdates, setSacUpdates] = useState<SACUpdate[]>([]);
+  const [problemOrigins, setProblemOrigins] = useState<{ id: string; name: string }[]>([]);
+  const [isUpdatingProblemOrigin, setIsUpdatingProblemOrigin] = useState(false);
+
   const [complaintTypes, setComplaintTypes] = useState<{ id: string; name: string }[]>([]);
   const [invoiceDraft, setInvoiceDraft] = useState<string>('');
   const [messageDraft, setMessageDraft] = useState<string>('');
@@ -468,6 +473,126 @@ export default function AdminDashboard() {
     if (!error) setComplaintTypes((data as any) || []);
   };
 
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from('problem_origins')
+        .select('id,name')
+        .eq('active', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error(error);
+        toast.error('Erro ao carregar origens de problemas');
+        return;
+      }
+      setProblemOrigins(data || []);
+    })();
+  }, [user?.id, isAdmin]);
+
+  // SAC_ORIGINS_AUTO_SYNC_V1
+  // Sincroniza o seletor de origens nas solicitacoes.
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    let disposed = false;
+    let running = false;
+
+    const refresh = async () => {
+      if (
+        disposed ||
+        running ||
+        document.visibilityState === 'hidden'
+      ) return;
+
+      running = true;
+
+      try {
+        const { data, error } = await (supabase as any)
+          .from('problem_origins')
+          .select('id,name')
+          .eq('active', true)
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        if (!disposed) {
+          const incoming = (data || []) as {
+            id: string;
+            name: string;
+          }[];
+
+          setProblemOrigins(previous =>
+            JSON.stringify(previous) === JSON.stringify(incoming)
+              ? previous
+              : incoming
+          );
+        }
+      } catch (error) {
+        console.warn('Sincronizacao de origens no painel:', error);
+      } finally {
+        running = false;
+      }
+    };
+
+    const onReturn = () => {
+      if (document.visibilityState === 'visible') {
+        void refresh();
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 3000);
+
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
+    };
+  }, [user?.id, isAdmin]);
+
+
+  const updateRequestProblemOrigin = async (
+    requestId: string,
+    value: string
+  ) => {
+    if (!canEditSalesFields) return;
+    setIsUpdatingProblemOrigin(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('sac_requests')
+        .update({ problem_origin: value })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      setRequests(prev => prev.map(r =>
+        r.id === requestId
+          ? ({ ...r, problem_origin: value } as any)
+          : r
+      ));
+
+      setSelectedRequest(prev =>
+        prev && prev.id === requestId
+          ? ({ ...prev, problem_origin: value } as any)
+          : prev
+      );
+
+      toast.success('Origem do problema atualizada');
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao salvar origem do problema');
+    } finally {
+      setIsUpdatingProblemOrigin(false);
+    }
+  };
+
   const updateRequestComplaintType = async (requestId: string, complaintType: string | null) => {
     setIsUpdatingComplaintType(true);
     try {
@@ -703,6 +828,12 @@ export default function AdminDashboard() {
                 Tipos de Reclamação
               </TabsTrigger>
             )}
+            {!isVendas && (
+              <TabsTrigger value="problem-origins" className="gap-2">
+                <GitBranch className="h-4 w-4" />
+                Origens de Problemas
+              </TabsTrigger>
+            )}
             {canManageUsers && !isVendas && (
               <TabsTrigger value="external-settings" className="gap-2">
                 <Mail className="h-4 w-4" />
@@ -895,7 +1026,8 @@ export default function AdminDashboard() {
                       <TableHeader>
                         <TableRow>
                               <TableHead>Protocolo</TableHead>
-                              <TableHead>Tipo</TableHead>
+                              <TableHead title="Origens dos Problemas" className="cursor-help">OP</TableHead>
+                              <TableHead title="Tipos de Reclamações" className="cursor-help">TR</TableHead>
                               <TableHead>Empresa</TableHead>
                               <TableHead>E-mail</TableHead>
                               <TableHead>Status</TableHead>
@@ -922,18 +1054,13 @@ export default function AdminDashboard() {
                                   <span>{request.protocol}</span>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col gap-1">
-                                  <Badge variant="outline" className={typeConf.color}>
-                                    <TypeIcon className="h-3 w-3 mr-1" />
-                                    {typeConf.label}
-                                  </Badge>
-                                  {request.contact_type === 'reclamacao' && request.complaint_type && (
-                                    <span className="text-xs text-red-600 font-medium">
-                                      {request.complaint_type}
-                                    </span>
-                                  )}
-                                </div>
+                              <TableCell className="text-sm font-medium">
+                                {(request as any).problem_origin || '—'}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">
+                                {request.contact_type === 'reclamacao'
+                                  ? (request.complaint_type || '—')
+                                  : typeConf.label}
                               </TableCell>
                               <TableCell className="font-medium">{request.name}</TableCell>
                               <TableCell className="text-muted-foreground">
@@ -1031,6 +1158,11 @@ export default function AdminDashboard() {
             {!isVendas && (
               <TabsContent value="complaint-types">
                 <ComplaintTypesManagement />
+              </TabsContent>
+            )}
+            {!isVendas && (
+              <TabsContent value="problem-origins">
+                <ProblemOriginsManagement />
               </TabsContent>
             )}
 
@@ -1217,6 +1349,35 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
+
+                  {selectedRequest.contact_type === 'reclamacao' && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">
+                        Origem do Problema
+                      </Label>
+                      <div className="mt-1">
+                        <Select
+                          value={(selectedRequest as any).problem_origin || undefined}
+                          onValueChange={value =>
+                            updateRequestProblemOrigin(selectedRequest.id, value)
+                          }
+                          disabled={isUpdatingProblemOrigin || !canEditSalesFields}
+                        >
+                          <SelectTrigger className="w-[220px]">
+                            <SelectValue placeholder="Selecionar origem..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {problemOrigins.map(origin => (
+                              <SelectItem key={origin.id} value={origin.name}>
+                                {origin.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
 
                 <div>

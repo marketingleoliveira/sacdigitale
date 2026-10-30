@@ -1,3 +1,4 @@
+// relatorio_op_tr_v1
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -125,6 +126,188 @@ function ensureTableFits(
   return startY;
 }
 
+
+// DIGITALE_PDF_RANKINGS_V1
+function addComplaintRankingPages(
+  doc: jsPDF,
+  items: SACRequest[],
+  periodLabel: string
+) {
+  const reclamacoes = items.filter(
+    r => r.contact_type === 'reclamacao'
+  );
+
+  const configurations = [
+    {
+      title: 'Origens dos Problemas',
+      header: 'Origens dos Problemas',
+      getValue: (r: SACRequest) =>
+        String((r as any).problem_origin || '').trim() || 'Não classificada'
+    },
+    {
+      title: 'Tipos de Reclamações',
+      header: 'Tipos de Reclamações',
+      getValue: (r: SACRequest) =>
+        String((r as any).complaint_type || '').trim() || 'Não classificada'
+    }
+  ];
+
+  for (const config of configurations) {
+    const totals = new Map<string, {
+      total: number;
+      procedentes: number;
+      improcedentes: number;
+      pendentes: number;
+    }>();
+
+    for (const r of reclamacoes) {
+      const name = config.getValue(r);
+      const count = totals.get(name) || {
+        total: 0,
+        procedentes: 0,
+        improcedentes: 0,
+        pendentes: 0
+      };
+
+      count.total++;
+
+      if (r.procedencia === 'procedente') {
+        count.procedentes++;
+      } else if (r.procedencia === 'improcedente') {
+        count.improcedentes++;
+      } else {
+        count.pendentes++;
+      }
+
+      totals.set(name, count);
+    }
+
+    const ranking = [...totals.entries()].sort(
+      (a, b) =>
+        b[1].total - a[1].total ||
+        a[0].localeCompare(b[0], 'pt-BR')
+    );
+
+    const percentage = (n: number) =>
+      reclamacoes.length
+        ? `${(n * 100 / reclamacoes.length).toFixed(1)}%`
+        : '0%';
+
+    const body: (string | number)[][] = ranking.map(
+      ([name, c], index) => [
+        index + 1,
+        name,
+        c.total,
+        percentage(c.total),
+        c.procedentes,
+        c.improcedentes,
+        c.pendentes
+      ]
+    );
+
+    if (body.length) {
+      body.push([
+        '',
+        'Total',
+        reclamacoes.length,
+        '100%',
+        ranking.reduce((s, [, c]) => s + c.procedentes, 0),
+        ranking.reduce((s, [, c]) => s + c.improcedentes, 0),
+        ranking.reduce((s, [, c]) => s + c.pendentes, 0)
+      ]);
+    } else {
+      body.push([
+        '—', 'Sem reclamações no período',
+        0, '0%', 0, 0, 0
+      ]);
+    }
+
+    doc.addPage();
+
+    const width = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(0, 0, 0);
+    doc.rect(0, 0, width, 19, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(config.title, 12, 12);
+
+    doc.setTextColor(80, 80, 80);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Período: ${periodLabel}`, 12, 27);
+
+    doc.text(
+      `Total de reclamações: ${reclamacoes.length}`,
+      width - 12,
+      27,
+      { align: 'right' }
+    );
+
+    const headers = [[
+      '#',
+      config.header,
+      'Quantidade',
+      '% do total',
+      'Procedentes',
+      'Improcedentes',
+      'Não avaliadas'
+    ]];
+
+    autoTable(doc, {
+      startY: 34,
+      head: headers,
+      body,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [0, 0, 0],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      bodyStyles: {
+        textColor: [30, 30, 30],
+        fontSize: 9
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      styles: {
+        cellPadding: 3,
+        overflow: 'linebreak',
+        valign: 'middle'
+      },
+      columnStyles: {
+        0: { cellWidth: 13, halign: 'center' },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 29, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center' },
+        4: { cellWidth: 30, halign: 'center' },
+        5: { cellWidth: 33, halign: 'center' },
+        6: { cellWidth: 30, halign: 'center' }
+      },
+      margin: {
+        left: 12,
+        right: 12,
+        top: 22,
+        bottom: 16
+      },
+      didParseCell: data => {
+        if (
+          ranking.length > 0 &&
+          data.section === 'body' &&
+          data.row.index === body.length - 1
+        ) {
+          data.cell.styles.fillColor = [225, 230, 237];
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+  }
+}
+
 async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRequest[], stats: MonthlyStats) {
   const doc = new jsPDF('l', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -248,6 +431,8 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     y = (doc as any).lastAutoTable.finalY + 10;
   }
 
+  addComplaintRankingPages(doc, items, monthLabel);
+
   // Detail table
   doc.addPage();
 
@@ -261,8 +446,9 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
 
   const detailBody = items.map((r) => [
     r.protocol,
-    contactTypeLabels[r.contact_type] || r.contact_type,
+    (r as any).problem_origin || '—',
     r.contact_type === 'reclamacao' ? ((r as any).complaint_type || '—') : '—',
+    contactTypeLabels[r.contact_type] || r.contact_type,
     r.order_number || '—',
     r.name,
     r.email,
@@ -273,7 +459,7 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
 
   autoTable(doc, {
     startY: 20,
-    head: [['Protocolo', 'Tipo', 'Tipo Reclamação', 'Nota Fiscal', 'Nome', 'E-mail', 'Status', 'Procedência', 'Data']],
+    head: [['Protocolo', 'Origens dos Problemas', 'Tipos de Reclamações', 'Tipo', 'Nota Fiscal', 'Nome', 'E-mail', 'Status', 'Procedência', 'Data']],
     body: detailBody,
     theme: 'grid',
     headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -283,15 +469,16 @@ async function exportMonthPDF(monthKey: string, monthLabel: string, items: SACRe
     styles: { cellPadding: 2, overflow: 'linebreak' },
     rowPageBreak: 'avoid',
     columnStyles: {
-      0: { cellWidth: 28 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 36 },
-      3: { cellWidth: 30 },
-      4: { cellWidth: 38 },
-      5: { cellWidth: 50 },
-      6: { cellWidth: 24 },
-      7: { cellWidth: 26 },
-      8: { cellWidth: 22 },
+      0: { cellWidth: 26 },
+      1: { cellWidth: 25 },
+      2: { cellWidth: 26 },
+      3: { cellWidth: 20 },
+      4: { cellWidth: 23 },
+      5: { cellWidth: 35 },
+      6: { cellWidth: 39 },
+      7: { cellWidth: 23 },
+      8: { cellWidth: 25 },
+      9: { cellWidth: 22 },
     },
   });
 
@@ -557,6 +744,8 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     rowPageBreak: 'avoid',
   });
 
+  addComplaintRankingPages(doc, items, periodLabel);
+
   // Detalhe — apenas reclamações
   doc.addPage();
   doc.setFillColor(...blackColor);
@@ -570,6 +759,7 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .map((r) => [
       r.protocol,
+      (r as any).problem_origin || '—',
       (r as any).complaint_type || 'Não classificada',
       r.order_number || '—',
       r.name,
@@ -580,8 +770,8 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
 
   autoTable(doc, {
     startY: 20,
-    head: [['Protocolo', 'Tipo de Reclamação', 'Nota Fiscal', 'Empresa', 'Status', 'Procedência', 'Data']],
-    body: detailBody.length > 0 ? detailBody : [['—', 'Sem reclamações no período', '—', '—', '—', '—', '—']],
+    head: [['Protocolo', 'Origens dos Problemas', 'Tipos de Reclamações', 'Nota Fiscal', 'Empresa', 'Status', 'Procedência', 'Data']],
+    body: detailBody.length > 0 ? detailBody : [['—', '—', 'Sem reclamações no período', '—', '—', '—', '—', '—']],
     theme: 'grid',
     headStyles: { fillColor: blackColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     bodyStyles: { fontSize: 8.5, textColor: blackColor },
@@ -590,13 +780,14 @@ async function exportConsolidatedPDF(selectedStats: MonthlyStats[], items: SACRe
     styles: { cellPadding: 2, overflow: 'linebreak' },
     rowPageBreak: 'avoid',
     columnStyles: {
-      0: { cellWidth: 32 },
-      1: { cellWidth: 58 },
-      2: { cellWidth: 34 },
-      3: { cellWidth: 60 },
-      4: { cellWidth: 28 },
-      5: { cellWidth: 30 },
-      6: { cellWidth: 24 },
+      0: { cellWidth: 29 },
+      1: { cellWidth: 32 },
+      2: { cellWidth: 32 },
+      3: { cellWidth: 27 },
+      4: { cellWidth: 54 },
+      5: { cellWidth: 26 },
+      6: { cellWidth: 27 },
+      7: { cellWidth: 23 },
     },
   });
 

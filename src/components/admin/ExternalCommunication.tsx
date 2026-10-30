@@ -49,56 +49,100 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
 
   const load = async () => {
     setLoading(true);
-    const normalized = (recipientEmail || '').trim().toLowerCase();
-    const { data, error } = await supabase
-      .from('email_communications')
-      .select('*')
-      .or(
-        `sac_request_id.eq.${sacRequestId}` +
-          (normalized ? `,from_email.ilike.${normalized},to_email.ilike.${normalized}` : '')
-      )
-      .order('created_at', { ascending: true });
-    if (error) toast.error('Erro ao carregar e-mails');
-    const rows = ((data as unknown) as EmailItem[]) || [];
-    const seen = new Set<string>();
-    const DOMAIN = 'digitaletextil.com.br';
-    const visibleEmails = rows
-      .filter((email) => !isTechnicalEmptyEvent(email))
-      .filter((email) => {
-        // filter out internal Digitale-to-Digitale communications that aren't linked to this specific SAC
-        const from = (email.from_email || '').toLowerCase();
-        const to = (email.to_email || '').toLowerCase();
-        const isInternal = from.endsWith(`@${DOMAIN}`) && to.endsWith(`@${DOMAIN}`);
-        if (isInternal && email.sac_request_id !== sacRequestId) return false;
-        
-        if (seen.has(email.id)) return false;
-        seen.add(email.id);
-        return true;
-      })
-      .map((email) => ({
-        ...email,
-        _historical: email.sac_request_id !== sacRequestId,
-      }));
-    setEmails(visibleEmails);
-    setLoading(false);
+
+    try {
+      const { data, error } = await supabase
+        .from('email_communications')
+        .select('*')
+        .eq('sac_request_id', sacRequestId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error(
+          'Erro ao carregar comunicacoes externas:',
+          error
+        );
+
+        toast.error(
+          'Erro ao carregar e-mails'
+        );
+
+        setEmails([]);
+        return;
+      }
+
+      const rows =
+        ((data as unknown) as EmailItem[])
+        || [];
+
+      const seen =
+        new Set<string>();
+
+      const visibleEmails = rows
+        .filter(
+          (email) =>
+            !isTechnicalEmptyEvent(email)
+        )
+        .filter((email) => {
+          if (seen.has(email.id)) {
+            return false;
+          }
+
+          seen.add(email.id);
+
+          return true;
+        })
+        .map((email) => ({
+          ...email,
+          _historical: false,
+        }));
+
+      setEmails(
+        visibleEmails
+      );
+
+    } catch (error) {
+
+      console.error(
+        'Falha ao carregar comunicacoes externas:',
+        error
+      );
+
+      toast.error(
+        'Erro ao carregar e-mails'
+      );
+
+      setEmails([]);
+
+    } finally {
+
+      setLoading(false);
+    }
   };
 
   const syncInbox = async () => {
     setSyncing(true);
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke('imap-poll-inbox', {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
-      if (error || (data as any)?.error) {
-        throw new Error((data as any)?.error || error?.message || 'Falha ao sincronizar');
-      }
-      const r = data as { linked?: number; unlinked?: number; processed?: number; repaired?: number };
-      toast.success(`Sincronizado: ${r.processed ?? 0} lidos • ${r.linked ?? 0} vinculados • ${r.repaired ?? 0} reparados`);
-      load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao sincronizar');
+      await load();
+
+      toast.success(
+        'Comunicações atualizadas'
+      );
+
+    } catch (error) {
+
+      console.error(
+        'Erro ao atualizar comunicações:',
+        error
+      );
+
+      toast.error(
+        'Erro ao atualizar comunicações'
+      );
+
     } finally {
+
       setSyncing(false);
     }
   };
@@ -199,7 +243,7 @@ export default function ExternalCommunication({ sacRequestId, recipientEmail, pr
         )}
         <Button onClick={syncInbox} disabled={syncing} size="sm" variant="ghost" className="ml-auto h-7 gap-1 text-xs">
           {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-          Sincronizar respostas
+          Atualizar mensagens
         </Button>
       </div>
 

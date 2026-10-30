@@ -7,7 +7,7 @@ interface FileUploadProps {
   maxFiles?: number;
 }
 
-const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => {
+const FileUpload = ({ files, onFilesChange, maxFiles = 20 }: FileUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,7 +32,7 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
 
   const addFiles = (newFiles: File[]) => {
     const validFiles = newFiles.filter(
-      (file) => file.type.startsWith("image/") || file.type.startsWith("video/") || file.type === "application/pdf",
+      (file) => file.type.startsWith("image/") || file.type.startsWith("video/") || file.type === "application/pdf" || /\.(docx?|xlsx?|txt|csv|zip)$/i.test(file.name),
     );
     const updatedFiles = [...files, ...validFiles].slice(0, maxFiles);
     onFilesChange(updatedFiles);
@@ -76,13 +76,13 @@ const FileUpload = ({ files, onFilesChange, maxFiles = 3 }: FileUploadProps) => 
           ref={inputRef}
           type="file"
           multiple
-          accept="image/*,video/*,.pdf"
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
           onChange={(e) => addFiles(Array.from(e.target.files || []))}
           className="hidden"
         />
         <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
         <p className="text-foreground font-medium">Clique para enviar ou arraste seus arquivos</p>
-        <p className="text-sm text-muted-foreground mt-2">Imagens, vídeos ou PDF.</p>
+        <p className="text-sm text-muted-foreground mt-2">Imagens, vídeos, PDF e documentos. Até 20 arquivos.</p>
       </div>
 
       {files.length > 0 && (

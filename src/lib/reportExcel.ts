@@ -1,3 +1,4 @@
+// relatorio_op_tr_v1
 import ExcelJS from 'exceljs';
 
 export interface ExcelMonthlyStats {
@@ -20,6 +21,7 @@ export interface ExcelSacRow {
   protocol: string;
   contact_type: string;
   complaint_type?: string | null;
+  problem_origin?: string | null;
   order_number?: string | null;
   name: string;
   email: string;
@@ -153,12 +155,13 @@ function buildDetailSheet(workbook: ExcelJS.Workbook, name: string, subtitle: st
   styleSheetBase(sheet);
   const headers = [
     'Protocolo',
+    'Origens dos Problemas',
+    'Tipos de Reclamações',
     'Data',
     'Empresa',
     'E-mail',
     'Telefone',
     'Tipo de Contato',
-    'Tipo de Reclamação',
     'Nota Fiscal',
     'Assunto',
     'Status',
@@ -170,12 +173,13 @@ function buildDetailSheet(workbook: ExcelJS.Workbook, name: string, subtitle: st
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .map((r) => [
       r.protocol,
+      r.problem_origin || '—',
+      r.contact_type === 'reclamacao' ? r.complaint_type || 'Não classificada' : '—',
       new Date(r.created_at).toLocaleDateString('pt-BR'),
       r.name,
       r.email,
       r.phone || '—',
       contactTypeLabels[r.contact_type] || r.contact_type,
-      r.contact_type === 'reclamacao' ? r.complaint_type || 'Não classificada' : '—',
       r.order_number || '—',
       r.subject || '—',
       statusLabels[r.status] || r.status,
@@ -183,7 +187,7 @@ function buildDetailSheet(workbook: ExcelJS.Workbook, name: string, subtitle: st
     ]);
 
   const end = writeTable(sheet, 4, headers, rows.length ? rows : [headers.map(() => '—')], { numericFrom: 99 });
-  autoWidths(sheet, [16, 12, 30, 30, 16, 16, 26, 16, 34, 14, 16]);
+  autoWidths(sheet, [16, 25, 25, 12, 30, 30, 16, 16, 16, 34, 14, 16]);
   sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: headers.length } };
   sheet.views = [{ showGridLines: false, state: 'frozen', ySplit: 4 }];
   return end;
@@ -246,6 +250,7 @@ export async function exportMonthExcel(monthLabel: string, items: ExcelSacRow[],
   autoWidths(resumo, [34, 18, 20]);
 
   buildRankingSheet(workbook, monthLabel, items);
+  buildOriginsRankingSheet(workbook, monthLabel, items);
   buildDetailSheet(workbook, 'Detalhamento', monthLabel, items);
 
   await download(workbook, `relatorio-sac-${monthLabel.replace(/\s/g, '-').toLowerCase()}.xlsx`);
@@ -269,6 +274,119 @@ function rankingData(items: ExcelSacRow[]) {
   return {
     reclamacoes,
     ranking: Object.entries(map).sort((a, b) => b[1].total - a[1].total),
+  };
+}
+
+
+function buildOriginsRankingSheet(
+  workbook: ExcelJS.Workbook,
+  periodLabel: string,
+  items: ExcelSacRow[]
+) {
+  const reclamacoes = items.filter(
+    r => r.contact_type === 'reclamacao'
+  );
+
+  const totals = new Map<string, {
+    total: number;
+    procedentes: number;
+    improcedentes: number;
+    pendentes: number;
+  }>();
+
+  for (const r of reclamacoes) {
+    const origin = (r.problem_origin || '').trim() || 'Não classificada';
+
+    const counts = totals.get(origin) || {
+      total: 0,
+      procedentes: 0,
+      improcedentes: 0,
+      pendentes: 0
+    };
+
+    counts.total += 1;
+
+    if (r.procedencia === 'procedente') {
+      counts.procedentes += 1;
+    } else if (r.procedencia === 'improcedente') {
+      counts.improcedentes += 1;
+    } else {
+      counts.pendentes += 1;
+    }
+
+    totals.set(origin, counts);
+  }
+
+  const ranking = [...totals.entries()].sort(
+    (a, b) => b[1].total - a[1].total ||
+      a[0].localeCompare(b[0], 'pt-BR')
+  );
+
+  const sheet = workbook.addWorksheet('Origens dos Problemas', {
+    pageSetup: {
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1
+    }
+  });
+
+  styleSheetBase(sheet);
+
+  const headers = [
+    '#',
+    'Origens dos Problemas',
+    'Quantidade',
+    '% do total',
+    'Procedentes',
+    'Improcedentes',
+    'Não avaliadas'
+  ];
+
+  titleBlock(
+    sheet,
+    headers.length,
+    'Origens dos Problemas por Frequência',
+    periodLabel
+  );
+
+  const body: (string | number)[][] = ranking.map(
+    ([origin, counts], index) => [
+      index + 1,
+      origin,
+      counts.total,
+      pct(counts.total, reclamacoes.length),
+      counts.procedentes,
+      counts.improcedentes,
+      counts.pendentes
+    ]
+  );
+
+  if (body.length) {
+    body.push([
+      '',
+      'Total',
+      reclamacoes.length,
+      '100%',
+      ranking.reduce((n, [, c]) => n + c.procedentes, 0),
+      ranking.reduce((n, [, c]) => n + c.improcedentes, 0),
+      ranking.reduce((n, [, c]) => n + c.pendentes, 0)
+    ]);
+  } else {
+    body.push([
+      '—',
+      'Sem reclamações no período',
+      0, '0%', 0, 0, 0
+    ]);
+  }
+
+  writeTable(sheet, 4, headers, body, {
+    totalRow: ranking.length > 0,
+    numericFrom: 2
+  });
+
+  autoWidths(sheet, [6, 44, 16, 16, 18, 18, 18]);
+  sheet.getColumn(1).alignment = {
+    horizontal: 'center'
   };
 }
 
@@ -404,6 +522,7 @@ export async function exportConsolidatedExcel(selectedStats: ExcelMonthlyStats[]
   autoWidths(mensal, [22, 10, 14, 12, 10, 10, 12, 14, 12, 14, 15]);
 
   buildRankingSheet(workbook, periodLabel, items);
+  buildOriginsRankingSheet(workbook, periodLabel, items);
 
   // Evolução mensal por tipo
   if (sorted.length > 1) {
